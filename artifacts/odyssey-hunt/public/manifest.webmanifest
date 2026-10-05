@@ -1,0 +1,19 @@
+{
+  "name": "ODECEEE · The Odyssey",
+  "short_name": "The Odyssey",
+  "description": "A no-map GPS scavenger hunt across the NITK campus, presented by IET NITK.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050B1F",
+  "theme_color": "#050B1F",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

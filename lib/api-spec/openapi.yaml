@@ -2,14 +2,20 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
-  description: API specification
+  version: 1.0.0
+  description: API for ODECEEE · The Odyssey campus scavenger hunt
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Team and administrator authentication
+  - name: game
+    description: Team game state and route
+  - name: admin
+    description: Event administration
 paths:
   /healthz:
     get:
@@ -24,6 +30,369 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/team/login:
+    post:
+      operationId: teamLogin
+      tags: [auth]
+      summary: Sign in as a team
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamLoginInput"
+      responses:
+        "200":
+          description: Signed in team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid team name or passcode
+  /auth/admin/login:
+    post:
+      operationId: adminLogin
+      tags: [auth]
+      summary: Sign in as an administrator
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginInput"
+      responses:
+        "200":
+          description: Signed in administrator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Invalid credentials
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: End the current session
+      responses:
+        "200":
+          description: Session ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the current session
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
+          description: Not authenticated
+  /game/start:
+    post:
+      operationId: startVoyage
+      tags: [game]
+      summary: Start or resume a team's route
+      responses:
+        "200":
+          description: Current voyage state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameState"
+        "409":
+          description: The event is not accepting starts
+  /game/state:
+    get:
+      operationId: getGameState
+      tags: [game]
+      summary: Get the team's current checkpoint and progress
+      responses:
+        "200":
+          description: Current game state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameState"
+  /admin/checkpoints:
+    get:
+      operationId: getCheckpoints
+      tags: [admin]
+      summary: List checkpoints
+      responses:
+        "200":
+          description: Checkpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Checkpoint"
+    post:
+      operationId: createCheckpoint
+      tags: [admin]
+      summary: Create a checkpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckpointInput"
+      responses:
+        "201":
+          description: Created checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkpoint"
+  /admin/checkpoints/{id}:
+    patch:
+      operationId: updateCheckpoint
+      tags: [admin]
+      summary: Update a checkpoint
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckpointInput"
+      responses:
+        "200":
+          description: Updated checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Checkpoint"
+    delete:
+      operationId: deactivateCheckpoint
+      tags: [admin]
+      summary: Soft-delete a checkpoint
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deactivated checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /admin/teams:
+    get:
+      operationId: getTeams
+      tags: [admin]
+      summary: List teams and live progress
+      responses:
+        "200":
+          description: Teams
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminTeam"
+    post:
+      operationId: createTeam
+      tags: [admin]
+      summary: Create a team and generate a passcode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamInput"
+      responses:
+        "201":
+          description: Created team and one-time passcode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionedTeam"
+  /admin/teams/bulk:
+    post:
+      operationId: bulkCreateTeams
+      tags: [admin]
+      summary: Create teams from newline-separated names
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkTeamsInput"
+      responses:
+        "201":
+          description: Created teams and one-time passcodes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProvisionedTeam"
+  /admin/teams/{id}:
+    patch:
+      operationId: updateTeam
+      tags: [admin]
+      summary: Update a team's details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamUpdateInput"
+      responses:
+        "200":
+          description: Updated team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+    delete:
+      operationId: deleteTeam
+      tags: [admin]
+      summary: Delete a team
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted team
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /admin/teams/{id}/reset:
+    post:
+      operationId: resetTeam
+      tags: [admin]
+      summary: Reset a team's route and progress
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Reset team and new passcode
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionedTeam"
+  /admin/overview:
+    get:
+      operationId: getAdminOverview
+      tags: [admin]
+      summary: Get event status, summary metrics, and leaderboard
+      responses:
+        "200":
+          description: Live event overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminOverview"
+  /admin/settings:
+    get:
+      operationId: getGameSettings
+      tags: [admin]
+      summary: Get game settings
+      responses:
+        "200":
+          description: Current game settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSettings"
+    patch:
+      operationId: updateGameSettings
+      tags: [admin]
+      summary: Update capture thresholds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GameSettingsInput"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameSettings"
+  /admin/event/start:
+    post:
+      operationId: startEvent
+      tags: [admin]
+      summary: Start the event
+      responses:
+        "200":
+          description: Event status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStatusResponse"
+  /admin/event/pause:
+    post:
+      operationId: pauseEvent
+      tags: [admin]
+      summary: Pause the event
+      responses:
+        "200":
+          description: Event status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStatusResponse"
+  /admin/event/end:
+    post:
+      operationId: endEvent
+      tags: [admin]
+      summary: End the event
+      responses:
+        "200":
+          description: Event status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStatusResponse"
+  /admin/export.csv:
+    get:
+      operationId: exportResults
+      tags: [admin]
+      summary: Download event results as CSV
+      responses:
+        "200":
+          description: CSV results
+          content:
+            text/csv:
+              schema:
+                type: string
 components:
   schemas:
     HealthStatus:
@@ -33,4 +402,207 @@ components:
           type: string
       required:
         - status
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required: [ok]
+    AuthUser:
+      type: object
+      properties:
+        id: { type: string }
+        role: { type: string, enum: [TEAM, ADMIN] }
+        name: { type: ["string", "null"] }
+        teamId: { type: ["string", "null"] }
+      required: [id, role, name, teamId]
+    AuthResponse:
+      type: object
+      properties:
+        user: { $ref: "#/components/schemas/AuthUser" }
+      required: [user]
+    TeamLoginInput:
+      type: object
+      properties:
+        teamName: { type: string, minLength: 1 }
+        passcode: { type: string, minLength: 1 }
+      required: [teamName, passcode]
+    AdminLoginInput:
+      type: object
+      properties:
+        username: { type: string, minLength: 1 }
+        password: { type: string, minLength: 1 }
+      required: [username, password]
+    Checkpoint:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        radiusM: { type: number }
+        hint: { type: ["string", "null"] }
+        isActive: { type: boolean }
+        createdAt: { type: string, format: date-time }
+      required: [id, name, lat, lng, radiusM, hint, isActive, createdAt]
+    CheckpointInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        lat: { type: number, minimum: -90, maximum: 90 }
+        lng: { type: number, minimum: -180, maximum: 180 }
+        radiusM: { type: number, minimum: 5, maximum: 200 }
+        hint: { type: ["string", "null"], maxLength: 500 }
+      required: [name, lat, lng, radiusM]
+    TeamInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        members: { type: ["string", "null"], maxLength: 500 }
+      required: [name]
+    BulkTeamsInput:
+      type: object
+      properties:
+        names: { type: string, minLength: 1, maxLength: 10000 }
+      required: [names]
+    TeamUpdateInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 80 }
+        members: { type: ["string", "null"], maxLength: 500 }
+    TeamStatus:
+      type: string
+      enum: [NOT_STARTED, ACTIVE, FINISHED]
+    AdminTeam:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        members: { type: ["string", "null"] }
+        status: { $ref: "#/components/schemas/TeamStatus" }
+        startedAt: { type: ["string", "null"], format: date-time }
+        finishedAt: { type: ["string", "null"], format: date-time }
+        currentIndex: { type: integer }
+        totalCheckpoints: { type: integer }
+        currentCheckpoint: { type: ["string", "null"] }
+        lastLat: { type: ["number", "null"] }
+        lastLng: { type: ["number", "null"] }
+        lastAccuracy: { type: ["number", "null"] }
+        lastSeenAt: { type: ["string", "null"], format: date-time }
+        suspicious: { type: boolean }
+        completionCount: { type: integer }
+        assignedRoute:
+          type: array
+          items: { $ref: "#/components/schemas/AdminRouteEntry" }
+        completions:
+          type: array
+          items: { $ref: "#/components/schemas/Completion" }
+      required: [id, name, members, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, completionCount, assignedRoute, completions]
+    AdminRouteEntry:
+      type: object
+      properties:
+        checkpointId: { type: string }
+        checkpointName: { type: string }
+        orderIndex: { type: integer }
+        lat: { type: number }
+        lng: { type: number }
+        radiusM: { type: number }
+        isActive: { type: boolean }
+      required: [checkpointId, checkpointName, orderIndex, lat, lng, radiusM, isActive]
+    ProvisionedTeam:
+      type: object
+      properties:
+        team: { $ref: "#/components/schemas/AdminTeam" }
+        passcode: { type: string }
+      required: [team, passcode]
+    Completion:
+      type: object
+      properties:
+        id: { type: string }
+        checkpointId: { type: string }
+        checkpointName: { type: string }
+        completedAt: { type: string, format: date-time }
+        distanceAtCaptureM: { type: number }
+        accuracyM: { type: number }
+      required: [id, checkpointId, checkpointName, completedAt, distanceAtCaptureM, accuracyM]
+    GameCheckpoint:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lat: { type: number }
+        lng: { type: number }
+        radiusM: { type: number }
+        hint: { type: ["string", "null"] }
+      required: [id, name, lat, lng, radiusM, hint]
+    GameState:
+      type: object
+      properties:
+        eventStatus: { type: string, enum: [NOT_STARTED, ACTIVE, PAUSED, ENDED] }
+        team:
+          oneOf:
+            - $ref: "#/components/schemas/GameTeamStatus"
+            - type: "null"
+        currentCheckpoint:
+          oneOf:
+            - $ref: "#/components/schemas/GameCheckpoint"
+            - type: "null"
+        progress: { type: integer }
+        total: { type: integer }
+        completions:
+          type: array
+          items: { $ref: "#/components/schemas/Completion" }
+      required: [eventStatus, team, currentCheckpoint, progress, total, completions]
+    GameTeamStatus:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        status: { $ref: "#/components/schemas/TeamStatus" }
+        startedAt: { type: ["string", "null"], format: date-time }
+        finishedAt: { type: ["string", "null"], format: date-time }
+        currentIndex: { type: integer }
+        totalCheckpoints: { type: integer }
+      required: [id, name, status, startedAt, finishedAt, currentIndex, totalCheckpoints]
+    GameSettings:
+      type: object
+      properties:
+        defaultRadiusM: { type: number }
+        accuracySlackM: { type: number }
+        maxAccuracyM: { type: number }
+      required: [defaultRadiusM, accuracySlackM, maxAccuracyM]
+    GameSettingsInput:
+      type: object
+      properties:
+        defaultRadiusM: { type: number, minimum: 5, maximum: 200 }
+        accuracySlackM: { type: number, minimum: 0, maximum: 200 }
+        maxAccuracyM: { type: number, minimum: 10, maximum: 300 }
+    EventStatusResponse:
+      type: object
+      properties:
+        status: { type: string, enum: [NOT_STARTED, ACTIVE, PAUSED, ENDED] }
+      required: [status]
+    AdminOverview:
+      type: object
+      properties:
+        eventStatus: { type: string, enum: [NOT_STARTED, ACTIVE, PAUSED, ENDED] }
+        teamCount: { type: integer }
+        activeCount: { type: integer }
+        finishedCount: { type: integer }
+        stalledCount: { type: integer }
+        checkpointCount: { type: integer }
+        completionCount: { type: integer }
+        leaderboard:
+          type: array
+          items: { $ref: "#/components/schemas/AdminTeam" }
+        recentCompletions:
+          type: array
+          items:
+            type: object
+            properties:
+              teamName: { type: string }
+              checkpointName: { type: string }
+              completedAt: { type: string, format: date-time }
+            required: [teamName, checkpointName, completedAt]
+      required: [eventStatus, teamCount, activeCount, finishedCount, stalledCount, checkpointCount, completionCount, leaderboard, recentCompletions]
 

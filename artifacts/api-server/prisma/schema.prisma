@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TeamStatus {
+  NOT_STARTED
+  ACTIVE
+  FINISHED
+}
+
+enum EventStatus {
+  NOT_STARTED
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+model Admin {
+  id           String @id @default(cuid())
+  username     String @unique
+  passwordHash String
+}
+
+model Team {
+  id            String      @id @default(cuid())
+  name          String      @unique
+  passcodeHash  String
+  members       String?
+  status        TeamStatus  @default(NOT_STARTED)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  currentIndex  Int         @default(0)
+  lastLat       Float?
+  lastLng       Float?
+  lastAccuracy  Float?
+  lastSeenAt    DateTime?
+  sessionVersion Int         @default(0)
+  suspicious    Boolean     @default(false)
+  routes        TeamRoute[]
+  completions   Completion[]
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model Checkpoint {
+  id          String       @id @default(cuid())
+  name        String
+  lat         Float
+  lng         Float
+  radiusM     Float        @default(30)
+  hint        String?
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  routes      TeamRoute[]
+  completions Completion[]
+}
+
+model TeamRoute {
+  id           String     @id @default(cuid())
+  teamId       String
+  checkpointId String
+  orderIndex   Int
+  team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, orderIndex])
+  @@unique([teamId, checkpointId])
+  @@index([checkpointId])
+}
+
+model Completion {
+  id                  String     @id @default(cuid())
+  teamId              String
+  checkpointId        String
+  completedAt         DateTime   @default(now())
+  distanceAtCaptureM  Float
+  accuracyM           Float
+  team                Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  checkpoint          Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
+
+  @@unique([teamId, checkpointId])
+  @@index([completedAt])
+}
+
+model GameSettings {
+  id              String   @id @default("global")
+  defaultRadiusM  Float    @default(30)
+  accuracySlackM  Float    @default(40)
+  maxAccuracyM    Float    @default(200)
+  updatedAt       DateTime @updatedAt
+}
+
+model EventState {
+  id        String      @id @default("global")
+  status    EventStatus @default(NOT_STARTED)
+  startedAt DateTime?
+  endedAt   DateTime?
+  updatedAt DateTime    @updatedAt
+}

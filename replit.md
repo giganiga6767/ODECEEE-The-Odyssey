@@ -1,45 +1,35 @@
-# [Project name]
+# ODECEEE · The Odyssey
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Mobile-first NITK GPS scavenger hunt for student teams, with a separate IET NITK volunteer console.
 
-## Run & Operate
+## Run & operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- The managed `artifacts/odyssey-hunt: web` and `artifacts/api-server: API Server` workflows serve the app and API.
+- `pnpm run typecheck` checks shared libraries, the API, and the web app.
+- `pnpm --filter @workspace/api-spec run codegen` regenerates API hooks and Zod schemas from `lib/api-spec/openapi.yaml`.
+- `pnpm --filter @workspace/api-server run db:migrate` and `run seed` target the development database through the workflow environment.
+- Required secrets: `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `SESSION_SECRET` (or a `JWT_SECRET` of at least 32 characters). `DATABASE_URL` is Replit-managed.
 
-## Stack
+## Source of truth
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Web and game screens: `artifacts/odyssey-hunt/src/App.tsx`
+- Player theme and motion preferences: `artifacts/odyssey-hunt/src/index.css`
+- Persistent logo path: `artifacts/odyssey-hunt/public/branding/iet-nitk-logo.svg`
+- REST contract: `lib/api-spec/openapi.yaml`
+- PostgreSQL schema and migrations: `artifacts/api-server/prisma/`
+- REST and Socket.IO server: `artifacts/api-server/src/`
 
-## Where things live
+## Product behavior
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- Teams see only their current checkpoint. The volunteer-only admin view contains team positions and assigned routes.
+- The oracle direction and distance band refresh on a 39-second cycle; GPS fixes update refs and server telemetry between cycles.
+- The server validates capture distance and accuracy from consecutive location updates; clients cannot submit a capture directly.
+- Event status, passcodes, teams, checkpoints, settings, and result export are managed in the admin console.
 
-## Architecture decisions
+## Operational constraints
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
-
-## Product
-
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
-
-## Gotchas
-
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- The seed’s eight `REPLACE WITH REAL LOCATIONS` entries are not event locations. Replace them before testing outdoors or publishing.
+- Keep the event API single-instance: Socket.IO and the consecutive-ping anti-cheat window use in-process state.
+- Keep REST routed through `/api` and WebSockets through `/api/socket.io`; both paths must remain listed in `artifacts/api-server/.replit-artifact/artifact.toml`.
+- Do not migrate or seed production during a build. Review and apply production Prisma migrations to the intended database before publishing code that depends on them.
+- See `README.md` for the event checklist, route table, local commands, and publishing notes.
