@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "ODECEEE · The Odyssey"
+description = "A mobile-first GPS scavenger hunt for ODECEEE at NITK, with a no-map compass and proximity audio for teams and live game operations for IET NITK volunteers."
+version = "1.0.0"
+id = "artifacts/odyssey-hunt"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25059
+
+[services.development]
+run = "pnpm --filter @workspace/odyssey-hunt run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/odyssey-hunt", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/odyssey-hunt/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25059"
+BASE_PATH = "/"
