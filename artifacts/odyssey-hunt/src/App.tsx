@@ -55,9 +55,10 @@ const timeAgo = (date?: string | null) => {
   const sec = Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 1000));
   return sec < 60 ? `${sec}s ago` : `${Math.floor(sec / 60)}m ago`;
 };
-function Brand({ compact = false }: { compact?: boolean }) {
+function Brand({ compact = false, darkSurface = false }: { compact?: boolean; darkSurface?: boolean }) {
+  const logoSurfaceClass = darkSurface || compact ? 'bg-[#f1e4c4]' : 'bg-[#e8d6b0]';
   return <div className="flex items-center gap-3">
-    <div className="grid h-11 w-11 shrink-0 place-items-center border border-[#9c7a4b] bg-[#f1e4c4] p-1.5">
+    <div className={`grid h-11 w-11 shrink-0 place-items-center ${logoSurfaceClass}`}>
       <img src={BRAND.logoPath} alt={BRAND.organiser} className="h-full w-full object-contain mix-blend-multiply"/>
     </div>
     <div className="min-w-0">
@@ -67,8 +68,9 @@ function Brand({ compact = false }: { compact?: boolean }) {
     </div>
   </div>;
 }
-function LogoUploadSlot({small=false,slot='logo'}:{small?:boolean;slot?:string}) {
-  return <div className={`flex shrink-0 items-center justify-center border border-[#9c7a4b] bg-[#f1e4c4] p-1.5 ${small?'h-11 w-11':'h-12 w-[148px]'}`} title={BRAND.organiser}>
+function LogoUploadSlot({small=false,slot='logo',surface='parchment'}:{small?:boolean;slot?:string;surface?:'parchment'|'tag'}) {
+  const surfaceClass = surface === 'tag' || slot === 'admin-header' || slot === 'admin-sidebar' || slot === 'login-organiser' ? 'bg-[#f1e4c4]' : 'bg-[#e8d6b0]';
+  return <div className={`flex shrink-0 items-center justify-center ${surfaceClass} ${small?'h-11 w-11':'h-12 w-[148px]'}`} title={BRAND.organiser}>
     <img src={BRAND.logoPath} alt={BRAND.organiser} className="h-full w-full object-contain mix-blend-multiply" data-brand-slot={slot}/>
   </div>;
 }
@@ -186,7 +188,7 @@ function TeamEntry() {
   return <main className="relative min-h-[100dvh] overflow-hidden px-5 pb-12 pt-[max(18px,env(safe-area-inset-top))]">
     <Header label={BRAND.segment.toUpperCase()}/>
     <div className="poster-layout relative z-10 mx-auto grid max-w-6xl items-center gap-8 py-7 md:min-h-[calc(100dvh-105px)] md:grid-cols-[1.1fr_.9fr] md:gap-12 md:py-10">
-      <section className="poster-copy relative pb-28 text-left md:pb-16">
+      <section className="poster-copy relative text-left">
         <div className="poster-corner-frame" aria-hidden="true"><span/><span/><span/><span/></div>
         <p className="font-script text-[clamp(1.3rem,5vw,2.1rem)] leading-none text-[#5c4026]">{BRAND.presenter}</p>
         <h1 className="poster-title mt-3 font-cinzel uppercase leading-[.95] tracking-[-.045em] text-[#2a1b10]" aria-label={BRAND.event}><span>{brandTitleLineOne}</span>{brandTitleLineTwo&&<span>{brandTitleLineTwo}</span>}</h1>
@@ -206,7 +208,7 @@ function TeamEntry() {
           <GoldButton type="submit" disabled={login.isPending||normalizeTeamCode(accessCode).length!==8||(needsCaptainName&&!captainName.trim())} data-testid="button-begin-voyage">{login.isPending?'Checking the code…':needsCaptainName?'Claim this phone':'Continue'}<ArrowRight size={17}/></GoldButton>
         </form>
         <div className="mt-5 flex items-start gap-2 border-t border-[#9c7a4b80] pt-4 text-xs leading-relaxed text-[#5c4026]"><Shield size={14} className="mt-0.5 shrink-0"/>Captain only. Keep this phone with your team. Ask an IET NITK organiser if you lose your code or phone.</div>
-        <div className="organiser-tag mt-5 flex items-center gap-3 border border-[#9c7a4b] bg-[#e8d6b0] p-2"><LogoUploadSlot slot="login-organiser"/><span className="label">Organised by<br/><strong className="mt-1 block text-[#2a1b10]">{BRAND.organiser}</strong></span></div>
+        <div className="organiser-tag mt-5 flex items-center gap-3"><LogoUploadSlot surface="tag" slot="login-organiser"/><span className="label">Organised by<br/><strong className="mt-1 block text-[#2a1b10]">{BRAND.organiser}</strong></span></div>
       </section>
     </div>
     <footer className="relative z-10 text-center font-cormorant text-base italic text-[#5c4026]">{BRAND.event} · {BRAND.subtitle}</footer>
@@ -460,7 +462,7 @@ function AdminShell({children,title}:{children:ReactNode;title:string}) {
   useEffect(()=>{if(user.isError)setLocation('/admin/login');else if(user.data?.user?.role==='TEAM')setLocation('/');},[user.isError,user.data,setLocation]);
   const signout=()=>logout.mutate(undefined,{onSuccess:()=>{void qc.invalidateQueries({queryKey:getGetCurrentUserQueryKey()});setLocation('/admin/login');}});
   return <div className="admin-shell relative min-h-[100dvh] md:flex">
-    <aside className="hidden w-[248px] shrink-0 border-r border-[#d4af3725] bg-[#071229] p-5 md:flex md:flex-col"><div className="mb-8"><Brand/><div className="mt-5" data-testid="logo-upload-slot"><LogoUploadSlot slot="admin-sidebar"/></div></div><p className="label mb-3 pl-3">VOLUNTEER CONSOLE</p><nav className="space-y-1">{adminNav.map(n=><Link href={n.href} key={n.href} className={`nav-item ${title===n.label?'active':''}`} data-testid={`link-admin-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={17}/>{n.label}</Link>)}</nav><div className="mt-auto border-t border-[#d4af3725] pt-4"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#d4af3750] font-cinzel text-[#f2d98a]">{user.data?.user?.name?.slice(0,1)||'I'}</div><div><div className="text-sm">{user.data?.user?.name||'IET Volunteer'}</div><div className="label">EVENT CREW</div></div></div><button onClick={signout} className="min-h-11 w-full text-left text-sm text-[#b9c4d5]" data-testid="button-admin-signout">Sign out</button></div></aside>
+    <aside className="hidden w-[248px] shrink-0 border-r border-[#d4af3725] bg-[#071229] p-5 md:flex md:flex-col"><div className="mb-8"><Brand darkSurface/><div className="mt-5" data-testid="logo-upload-slot"><LogoUploadSlot surface="tag" slot="admin-sidebar"/></div></div><p className="label mb-3 pl-3">VOLUNTEER CONSOLE</p><nav className="space-y-1">{adminNav.map(n=><Link href={n.href} key={n.href} className={`nav-item ${title===n.label?'active':''}`} data-testid={`link-admin-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={17}/>{n.label}</Link>)}</nav><div className="mt-auto border-t border-[#d4af3725] pt-4"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#d4af3750] font-cinzel text-[#f2d98a]">{user.data?.user?.name?.slice(0,1)||'I'}</div><div><div className="text-sm">{user.data?.user?.name||'IET Volunteer'}</div><div className="label">EVENT CREW</div></div></div><button onClick={signout} className="min-h-11 w-full text-left text-sm text-[#b9c4d5]" data-testid="button-admin-signout">Sign out</button></div></aside>
     <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-[#d4af3725] bg-[#050b1fee] px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button className="grid h-11 w-11 place-items-center text-[#f2d98a] md:hidden" onClick={()=>setMobile(!mobile)} aria-label="Open navigation" data-testid="button-mobile-menu">{mobile?<X/>:<Menu/>}</button><div className="md:hidden"><Brand compact/></div><span className="hidden font-cinzel text-sm tracking-widest md:block">{BRAND.event} <span className="text-[#8191a8]">/</span> {title.toUpperCase()}</span></div><div className="flex items-center gap-3"><span className={`hidden items-center gap-2 text-xs sm:flex ${adminSocket.connection==='connected'?'text-[#a7d7bd]':'text-[#d4af37]'}`} data-testid="status-admin-socket"><span className={`h-2 w-2 rounded-full ${adminSocket.connection==='connected'?'bg-[#73c999]':'bg-[#d4af37]'}`}/>{adminSocket.connection==='connected'?'LIVE CONSOLE':'RECONNECTING'}</span><LogoUploadSlot small slot="admin-header"/><button onClick={signout} className="hidden min-h-10 text-xs text-[#b9c4d5] md:block" data-testid="button-signout-top">Sign out</button></div></header>
       {captureNotice&&<div className="fixed right-4 top-[76px] z-40 max-w-[calc(100vw-2rem)] border border-[#73c99970] bg-[#0a1f35] px-4 py-3 text-sm text-[#c3ead1] shadow-xl" role="status" aria-live="polite" data-testid="toast-checkpoint-captured"><span className="mr-2 text-[#f2d98a]">OFFERING ACCEPTED</span>{captureNotice}</div>}
