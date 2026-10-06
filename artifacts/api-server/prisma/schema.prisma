@@ -20,10 +20,17 @@ enum EventStatus {
   ENDED
 }
 
+enum AdminRole {
+  ADMIN
+  VOLUNTEER
+}
+
 model Admin {
-  id           String @id @default(cuid())
-  username     String @unique
-  passwordHash String
+  id             String    @id @default(cuid())
+  username       String    @unique
+  passwordHash   String
+  role           AdminRole @default(ADMIN)
+  sessionVersion Int       @default(0)
 }
 
 model Team {

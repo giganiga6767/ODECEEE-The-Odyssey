@@ -417,6 +417,79 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/EventStatusResponse"
+  /admin/volunteers:
+    get:
+      operationId: getVolunteerAccounts
+      tags: [admin]
+      summary: List volunteer accounts
+      responses:
+        "200":
+          description: Volunteer accounts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/VolunteerAccount"
+    post:
+      operationId: createVolunteer
+      tags: [admin]
+      summary: Create a volunteer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolunteerAccountInput"
+      responses:
+        "201":
+          description: Created volunteer account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VolunteerAccount"
+  /admin/volunteers/{id}/password:
+    patch:
+      operationId: resetVolunteerPassword
+      tags: [admin]
+      summary: Reset a volunteer account password
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VolunteerPasswordInput"
+      responses:
+        "200":
+          description: Updated volunteer account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VolunteerAccount"
+  /admin/volunteers/{id}:
+    delete:
+      operationId: deleteVolunteerAccount
+      tags: [admin]
+      summary: Delete a volunteer account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Deleted volunteer account
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
   /admin/export.csv:
     get:
       operationId: exportResults
@@ -448,7 +521,7 @@ components:
       type: object
       properties:
         id: { type: string }
-        role: { type: string, enum: [TEAM, ADMIN] }
+        role: { type: string, enum: [TEAM, ADMIN, VOLUNTEER] }
         name: { type: ["string", "null"] }
         teamId: { type: ["string", "null"] }
       required: [id, role, name, teamId]
@@ -470,6 +543,23 @@ components:
         username: { type: string, minLength: 1 }
         password: { type: string, minLength: 1 }
       required: [username, password]
+    VolunteerAccount:
+      type: object
+      properties:
+        id: { type: string }
+        username: { type: string }
+      required: [id, username]
+    VolunteerAccountInput:
+      type: object
+      properties:
+        username: { type: string, minLength: 3, maxLength: 32, pattern: "^[A-Za-z0-9._-]+$" }
+        password: { type: string, minLength: 12, maxLength: 72 }
+      required: [username, password]
+    VolunteerPasswordInput:
+      type: object
+      properties:
+        password: { type: string, minLength: 12, maxLength: 72 }
+      required: [password]
     Checkpoint:
       type: object
       properties:
