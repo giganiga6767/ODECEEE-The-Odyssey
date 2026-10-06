@@ -2,6 +2,10 @@ import bcrypt from "bcrypt";
 import { randomBytes } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 
+if (process.loadEnvFile) {
+  try { process.loadEnvFile(); } catch {}
+}
+
 const required = ["DATABASE_URL", "ADMIN_USERNAME", "ADMIN_PASSWORD"];
 const missing = required.filter((key) => !process.env[key]);
 if (missing.length) {

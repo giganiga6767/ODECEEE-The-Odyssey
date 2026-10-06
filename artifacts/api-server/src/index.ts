@@ -1,16 +1,13 @@
+if (process.loadEnvFile) {
+  try { process.loadEnvFile(); } catch {}
+}
+
 import app from "./app";
 import { createServer } from "node:http";
 import { logger } from "./lib/logger";
 import { attachGameSockets } from "./socket";
 
-const rawPort = process.env["PORT"];
-
-if (!rawPort) {
-  throw new Error(
-    "PORT environment variable is required but was not provided.",
-  );
-}
-
+const rawPort = process.env["PORT"] || "8080";
 const port = Number(rawPort);
 
 if (Number.isNaN(port) || port <= 0) {

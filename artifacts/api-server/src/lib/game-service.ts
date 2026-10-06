@@ -223,7 +223,7 @@ async function createTeamRoute(
 
 export async function startTeamVoyage(teamId: string) {
   return prisma.$transaction(async (transaction) => {
-    await transaction.$queryRaw`SELECT pg_advisory_xact_lock(734921601)`;
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
     await createTeamRoute(transaction, teamId);
     const currentTeam = await transaction.team.findUnique({
       where: { id: teamId },

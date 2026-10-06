@@ -1,1 +1,0 @@
-- [Artifact build environments](artifact-build-env.md) — Vite artifact builds need their own `PORT` and `BASE_PATH` outside managed workflows.
