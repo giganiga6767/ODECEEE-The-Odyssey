@@ -27,24 +27,30 @@ model Admin {
 }
 
 model Team {
-  id            String      @id @default(cuid())
-  name          String      @unique
-  passcodeHash  String
-  members       String?
-  status        TeamStatus  @default(NOT_STARTED)
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  currentIndex  Int         @default(0)
-  lastLat       Float?
-  lastLng       Float?
-  lastAccuracy  Float?
-  lastSeenAt    DateTime?
-  sessionVersion Int         @default(0)
-  suspicious    Boolean     @default(false)
-  routes        TeamRoute[]
-  completions   Completion[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id             String       @id @default(cuid())
+  name           String       @unique
+  passcodeHash   String
+  codeHint       String       @default("")
+  members        String?
+  leaderName     String?
+  deviceId       String?
+  claimedAt      DateTime?
+  lastLoginAt    DateTime?
+  userAgent      String?
+  status         TeamStatus   @default(NOT_STARTED)
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  currentIndex   Int          @default(0)
+  lastLat        Float?
+  lastLng        Float?
+  lastAccuracy   Float?
+  lastSeenAt     DateTime?
+  sessionVersion Int          @default(0)
+  suspicious     Boolean      @default(false)
+  routes         TeamRoute[]
+  completions    Completion[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model Checkpoint {
@@ -74,25 +80,25 @@ model TeamRoute {
 }
 
 model Completion {
-  id                  String     @id @default(cuid())
-  teamId              String
-  checkpointId        String
-  completedAt         DateTime   @default(now())
-  distanceAtCaptureM  Float
-  accuracyM           Float
-  team                Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  checkpoint          Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
+  id                 String     @id @default(cuid())
+  teamId             String
+  checkpointId       String
+  completedAt        DateTime   @default(now())
+  distanceAtCaptureM Float
+  accuracyM          Float
+  team               Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  checkpoint         Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
 
   @@unique([teamId, checkpointId])
   @@index([completedAt])
 }
 
 model GameSettings {
-  id              String   @id @default("global")
-  defaultRadiusM  Float    @default(30)
-  accuracySlackM  Float    @default(40)
-  maxAccuracyM    Float    @default(200)
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default("global")
+  defaultRadiusM Float    @default(30)
+  accuracySlackM Float    @default(40)
+  maxAccuracyM   Float    @default(200)
+  updatedAt      DateTime @updatedAt
 }
 
 model EventState {

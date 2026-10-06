@@ -1,6 +1,14 @@
-# ODECEEE · The Odyssey
+# WATT A PLAY 3.0 · THE ODECEEE
 
-Mobile-first NITK GPS scavenger hunt for student teams, with a separate IET NITK volunteer console.
+Mobile-first NITK GPS treasure hunt presented by IET NITK, with a separate volunteer console.
+
+## Event-specific product rules
+
+- The supplied IET NITK logo at `artifacts/odyssey-hunt/public/branding/iet-nitk-logo.png` is fixed artwork; do not redraw, recolor, or replace it.
+- Players enter a team code only. First use records the captain’s name and binds that code to one browser/device; reuse on that device resumes the team.
+- Releasing a phone or issuing a replacement code preserves checkpoint progress. Route reset is separate, destructive, and must remain clearly labeled.
+- Keep the volunteer-only map and future checkpoint locations out of the player experience.
+- Keep the API single-instance for the event while GPS capture-window state and Socket.IO delivery are process-local.
 
 ## Run & operate
 

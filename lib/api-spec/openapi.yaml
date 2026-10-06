@@ -3,7 +3,7 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 1.0.0
-  description: API for ODECEEE · The Odyssey campus scavenger hunt
+  description: API for WATT A PLAY 3.0 campus treasure hunt
 servers:
   - url: /api
     description: Base API path
@@ -34,7 +34,7 @@ paths:
     post:
       operationId: teamLogin
       tags: [auth]
-      summary: Sign in as a team
+      summary: Claim a team captain session with one access code
       requestBody:
         required: true
         content:
@@ -49,7 +49,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/AuthResponse"
         "401":
-          description: Invalid team name or passcode
+          description: Invalid code, captain name required, or another device owns the session
   /auth/admin/login:
     post:
       operationId: adminLogin
@@ -304,6 +304,42 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProvisionedTeam"
+  /admin/teams/{id}/release-login:
+    post:
+      operationId: releaseTeamLogin
+      tags: [admin]
+      summary: Release a team's captain device without changing progress
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Team captain session released
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /admin/teams/{id}/regenerate-code:
+    post:
+      operationId: regenerateTeamCode
+      tags: [admin]
+      summary: Issue a new code without clearing team progress
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: New team code issued once
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProvisionedTeam"
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -424,9 +460,10 @@ components:
     TeamLoginInput:
       type: object
       properties:
-        teamName: { type: string, minLength: 1 }
-        passcode: { type: string, minLength: 1 }
-      required: [teamName, passcode]
+        code: { type: string, minLength: 8, maxLength: 16 }
+        deviceId: { type: string, minLength: 8, maxLength: 100 }
+        leaderName: { type: string, maxLength: 100 }
+      required: [code, deviceId]
     AdminLoginInput:
       type: object
       properties:
@@ -479,6 +516,11 @@ components:
         id: { type: string }
         name: { type: string }
         members: { type: ["string", "null"] }
+        codeHint: { type: string }
+        leaderName: { type: ["string", "null"] }
+        claimedAt: { type: ["string", "null"], format: date-time }
+        lastLoginAt: { type: ["string", "null"], format: date-time }
+        userAgent: { type: ["string", "null"] }
         status: { $ref: "#/components/schemas/TeamStatus" }
         startedAt: { type: ["string", "null"], format: date-time }
         finishedAt: { type: ["string", "null"], format: date-time }
@@ -497,7 +539,7 @@ components:
         completions:
           type: array
           items: { $ref: "#/components/schemas/Completion" }
-      required: [id, name, members, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, completionCount, assignedRoute, completions]
+      required: [id, name, members, codeHint, leaderName, claimedAt, lastLoginAt, userAgent, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, completionCount, assignedRoute, completions]
     AdminRouteEntry:
       type: object
       properties:

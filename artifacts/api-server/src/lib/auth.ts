@@ -12,6 +12,7 @@ export interface SessionUser {
   name: string | null;
   teamId: string | null;
   sessionVersion?: number;
+  deviceId?: string;
 }
 
 declare global {
@@ -28,10 +29,15 @@ export function signSession(user: SessionUser): string {
       role: user.role,
       name: user.name,
       teamId: user.teamId,
-      ...(user.role === "TEAM" ? { sessionVersion: user.sessionVersion ?? 0 } : {}),
+      ...(user.role === "TEAM"
+        ? {
+            sessionVersion: user.sessionVersion ?? 0,
+            deviceId: user.deviceId,
+          }
+        : {}),
     },
     env.jwtSecret,
-    { subject: user.id, expiresIn: "12h", issuer: "odeceee-the-odyssey" },
+    { subject: user.id, expiresIn: "24h", issuer: "watt-a-play-3-odeceee" },
   );
 }
 
@@ -58,7 +64,7 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
   if (!token) return null;
   try {
     const payload = jwt.verify(token, env.jwtSecret, {
-      issuer: "odeceee-the-odyssey",
+      issuer: "watt-a-play-3-odeceee",
     }) as JwtPayload;
     if (
       typeof payload.sub !== "string" ||
@@ -68,7 +74,9 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
     }
     if (
       payload.role === "TEAM" &&
-      (!Number.isInteger(payload.sessionVersion) || typeof payload.sessionVersion !== "number")
+      (!Number.isInteger(payload.sessionVersion) ||
+        typeof payload.sessionVersion !== "number" ||
+        typeof payload.deviceId !== "string")
     ) {
       return null;
     }
@@ -78,7 +86,10 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
       name: typeof payload.name === "string" ? payload.name : null,
       teamId: typeof payload.teamId === "string" ? payload.teamId : null,
       ...(payload.role === "TEAM"
-        ? { sessionVersion: payload.sessionVersion as number }
+        ? {
+            sessionVersion: payload.sessionVersion as number,
+            deviceId: payload.deviceId as string,
+          }
         : {}),
     };
   } catch {
@@ -95,13 +106,19 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   if (user.role === "TEAM" && user.sessionVersion !== undefined) {
     const team = await prisma.team.findUnique({
       where: { id: user.id },
-      select: { sessionVersion: true },
+      select: { sessionVersion: true, deviceId: true },
     });
-    if (!team || team.sessionVersion !== user.sessionVersion) {
-      res.status(401).json({ error: "This team session has been reset. Sign in again." });
+    if (
+      !team ||
+      team.sessionVersion !== user.sessionVersion ||
+      team.deviceId !== user.deviceId
+    ) {
+      clearSessionCookie(res);
+      res.status(401).json({ error: "This captain session is no longer active. Sign in again." });
       return;
     }
   }
+  setSessionCookie(res, signSession(user));
   req.authUser = user;
   next();
 };

@@ -1,0 +1,205 @@
+# ROLE
+You are a Senior Full-Stack Engineer specializing in mobile-first PWAs, real-time geolocation, Web Audio, and hand-crafted (not template-looking) UI. Build this inside Replit as a complete, runnable app. No placeholders, no pseudo-code, no "implement this yourself" stubs. If an earlier version of this app already exists in this Repl, keep any working logic (game engine, audio, sockets) and refactor everything else to match this spec.
+
+# ATTACHMENTS
+1. **Poster image:** VISUAL reference only. Copy its mood, layout and style. Its text ("PhoenixX '26", "Odyssey: The Chase") must NOT appear anywhere in the app.
+2. **IET NITK logo:** save as `/client/public/branding/iet-nitk-logo.png` and use exactly as provided (never redraw, recolor or distort it).
+
+# EVENT
+**WATT A PLAY 3.0: THE ODECEEE**, organised by **IET NITK** (National Institute of Technology Karnataka, Surathkal). The game segment is **"The Odyssey" treasure hunt**, a GPS scavenger hunt on the NITK campus. Do not expand or explain "ODECEEE"; keep it exactly as written, all caps.
+
+Players: NITK students on their own phones (iOS Safari and Android Chrome), walking outdoors, possibly on weak Wi-Fi or mobile data. Admins: IET NITK seniors/volunteers on phones and laptops.
+
+## Concept
+Teams walk with NO map. They navigate by a compass that only refreshes every 39 seconds (the **39-Second Oracle**) and by a proximity sound (the **Siren's Song**) that gets louder and higher-pitched as they near the target. Seniors watch everything live from the **God's Eye View**. Only the team captain logs in, using a single code.
+
+## Branding (single source of truth: `shared/branding.ts`)
+```ts
+export const BRAND = {
+  presenter: "IET NITK presents",
+  event: "WATT A PLAY 3.0",
+  subtitle: "THE ODECEEE",
+  segment: "The Odyssey · Treasure Hunt",
+  organiser: "IET NITK",
+  logoPath: "/branding/iet-nitk-logo.png",
+  shortName: "WATT A PLAY 3.0",
+};
+```
+ALL UI text, `<title>`, PWA manifest, OG tags, printable slips and CSV filenames (e.g. `watt-a-play-3-odeceee-results.csv`) read from `BRAND`. Grep the repo at the end to confirm no hard-coded event names remain.
+
+# REPLIT ENVIRONMENT RULES
+- Single Repl, single port. Express listens on `process.env.PORT || 5000`, bound to `0.0.0.0`. In production Express serves the built Vite output (`client/dist`) with an SPA fallback; `/api` and Socket.io share the same server and origin (no CORS issues).
+- Dev: one `npm run dev` runs Express (tsx watch) and Vite together. Production: `npm run build && npm start`. Provide correct `.replit` run and deploy config.
+- Database: Replit PostgreSQL via `DATABASE_URL` and Prisma. Run `prisma migrate deploy` in the build step; seed with `npm run seed`.
+- Secrets (Replit Secrets, never committed): `DATABASE_URL`, `JWT_SECRET`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`, `NODE_ENV`. Provide `.env.example`. Fail fast with a clear message if one is missing.
+- Deploy on a **Reserved VM** (or Autoscale capped at 1 machine). Socket.io state and in-memory rate limits assume one instance. Socket.io `transports: ['websocket','polling']`.
+- Replit provides HTTPS, so geolocation, DeviceOrientation and Wake Lock work. Add a startup check that warns if not in a secure context.
+
+# TECH STACK (fixed)
+- Frontend: React 18 + Vite + TypeScript (strict), React Router, TailwindCSS, Framer Motion, socket.io-client, Zustand
+- Backend: Node + Express + TypeScript, Socket.io, Prisma + PostgreSQL
+- Auth: JWT in httpOnly, secure, sameSite cookie; bcrypt; roles TEAM and ADMIN
+- Validation: Zod on every REST body and socket payload (schemas in `/shared`)
+- Security: helmet, express-rate-limit, per-socket rate limiting
+- Layout: `/client`, `/server`, `/shared`, simple root scripts (keep it reliable on Replit)
+- Tunables centralized in `shared/constants.ts` (39000 ms cycle, 100 m audio radius, 7000 ms emit interval, speed limit, etc.)
+
+---
+
+# PART 1: VISUAL DIRECTION, "AGED NAUTICAL MAP"
+The whole app must feel like a weathered treasure map and an expedition logbook, like the poster. No dark-blue, starfield or glowing-gold look.
+
+## 1.1 What to match from the poster
+- Warm tan/sepia parchment with uneven aging: darker burnt edges and corners (vignette), faint stains, fine paper grain, subtle fold creases.
+- Over it, a faint antique world-map engraving: latitude/longitude grid arcs, tiny sailing ships, coastlines, a compass-rose burst on the right, all in thin brown ink at low opacity.
+- **Left-aligned, poster-style typography:** small elegant script line on top, huge bold high-contrast serif ALL CAPS title, lighter letter-spaced caps subtitle.
+- Ornate engraved corner frame at the top-left, and a detailed black-ink tall-ship illustration anchored at the bottom.
+- Almost monochrome brown/black ink on tan. No bright colors.
+
+## 1.2 Tailwind tokens
+`parchment #E8D6B0`, `parchment-light #F1E4C4`, `parchment-aged #D2B98A`, `burnt-edge #9C7A4B`, `ink #2A1B10` (primary text), `sepia #5C4026`, `faded-ink #8A6E4B` (secondary text, map lines, never lighter), `oxblood #8B2E1F` (errors, compass needle, stamps), `moss #4F6B3A` (success), `amber-ink #B7791F` (warnings), `desk #1B120B` (dark walnut, only as backdrop behind paper on large screens and in the admin shell), **IET accent** `iet-plum #8C1D7C` and `iet-maroon #4E0F45` (from the logo; use sparingly for the organiser stamp, admin primary buttons, links, focus rings). WCAG AA text contrast.
+
+## 1.3 Typography (Google Fonts with serif fallbacks)
+- Titles: **Playfair Display** 800/900, uppercase, tight tracking
+- Script accents (presenter line, handwritten notes, distance words): **Pinyon Script** or **Mrs Saint Delafield**
+- Body/UI: **Crimson Pro** or **Libre Baskerville**
+- Numbers/coordinates/timers: **IBM Plex Mono** or **Courier Prime** in ink
+- Labels: small caps, wide letter-spacing, `sepia`
+
+## 1.4 Surfaces and components (physical objects)
+- **Background:** pre-rendered tileable paper-grain image (optimized, under 150 KB) plus CSS edge vignettes. NO animated SVG filters. Map engraving = one low-opacity fixed SVG/image layer, `pointer-events: none`.
+- **Cards:** torn/deckled edges (clip-path or SVG mask), slightly lighter than background, soft brown shadow. Not glass, not glossy-rounded.
+- **Buttons:** wax-seal / ink-stamp plaques. Solid `ink` or `oxblood`, parchment text in Playfair caps, rough edge, pressed state (translate 1-2px, shadow shrinks). No glow, gradients or pills.
+- **Inputs:** ruled line on paper, bottom border only, handwritten-style placeholder, `oxblood` caret. No boxed or floating-label inputs.
+- **Dividers:** thin double ink rules or small rope/anchor motif; corner ornaments in the poster's engraved style (SVG).
+- **Icons:** hand-drawn engraved-style SVG (anchor, compass rose, spyglass, rope, ship, scroll), stroke only. No icon-pack look, **no emoji anywhere**.
+- **Ship:** detailed black-ink tall-ship line-art SVG at the bottom of splash and loading screens, swappable in one place.
+- **Animation (restrained, physical):** ship bobs slowly (transform only); countdown ring is ink drawing itself (stroke-dashoffset); needle swings with a small overshoot; capture = big rotated **"FOUND"** ink stamp thudding in (scale 1.4 → 1, tiny shake) plus `navigator.vibrate`; page-turn/fade transitions. Respect `prefers-reduced-motion`. Remove starfield, glows, halos, particle bursts, neon.
+
+## 1.5 Make it feel hand-made, not AI-generated
+Avoid: purple/blue gradients, glassmorphism, glowing borders, centered stacks of identical rounded cards, emoji, sparkle icons, stock icon sprinkles, fantasy filler ("embark on a mystical journey", "unleash", "epic quest"), perfect symmetry.
+Do: asymmetric poster layouts, strong type hierarchy, intentional white space, slightly rotated stamps/tags (-2° to 2°), uneven hand-drawn borders, short plain ship's-log copy ("Enter your team code", "Captain's name", "Set sail", "Signal lost, step into the open", "Bearing updated", "Found. Next mark unlocked", "Voyage complete"). Greek flavor only in feature names. Real empty states and errors that say what to do next.
+
+## 1.6 Screens
+- **Splash/Login:** full-bleed parchment poster. Top-left ornate frame; script `presenter`; huge `event` title in Playfair caps, left-aligned, sized with `clamp()` so "WATT A PLAY 3.0" fits on two lines at 360px (break after "WATT A") with no overflow; letter-spaced `subtitle`; small italic `segment`. Faded map and compass rose behind; ship at bottom. The code field sits on a paper label in the lower-middle. IET NITK logo in a small cream tag with a thin ink border and "Organised by" in small caps.
+- **Oracle (navigation):** a chart table. Parchment map grid fills the screen, big hand-drawn compass rose in the center with an `oxblood` needle, the 39-second ink ring drawing around it, seconds remaining in Plex Mono below. Under it: "Bearing" and a handwritten distance word (Far / Near / Close / Very close). Slim log strip on top: team name, `Mark 3 of 8`, GPS status in plain words. Ink-wave sound indicator (also the visual audio cue for accessibility and noisy areas). Never a real map.
+- **Arrival:** FOUND stamp over the checkpoint name in a handwritten entry; optional hint as a torn note; button "Next mark".
+- **Finale:** "Voyage complete" as a ship's log page: total time, ruled table of checkpoints and timestamps, ship sailing off, organiser logo.
+- **Waiting/paused:** sealed scroll with wax seal: "The hunt hasn't started yet. Hold position."
+- **Permission denied:** torn note with exact steps for iOS Safari and Android Chrome in plain language.
+- **Admin:** `desk` walnut backdrop, parchment panels, ink text, Plex Mono numbers. Header: logo on cream tag + "WATT A PLAY 3.0: THE ODECEEE, Control Room". Primary buttons `iet-plum`. Status badges as paper stamps (moss/amber/oxblood). God's Eye View rows look like log entries. Fully usable on a phone.
+
+## 1.7 Logo handling
+The logo has a white background: render with `mix-blend-mode: multiply` over parchment or on a cream tag. Never on a dark background without the tag. Generate favicon, PWA icons (192/512) and manifest `theme-color #E8D6B0` from the logo on parchment. Do not use the poster image as a background.
+
+---
+
+# PART 2: TEAM LOGIN, ONE CODE, ONE CAPTAIN, ONE DEVICE
+
+## 2.1 Rules
+- Each team has **one access code** generated by the admin. No team-name or passcode field; the code alone identifies the team.
+- **Only the team captain logs in.** One person, one device at a time. Teammates follow the captain ("Keep this phone with your team").
+- A second device with the same code is refused. The same device always resumes silently.
+
+## 2.2 Code format
+- 8 characters in two groups (e.g. `K7MQ-4XPD`), alphabet without look-alikes (no `0 O 1 I L`), generated with `crypto.randomInt`.
+- Case-insensitive; ignore spaces and dashes; auto-uppercase and auto-insert the dash while typing.
+- Stored **hashed** (bcrypt or SHA-256 + pepper) plus a non-secret `codeHint` (first 2 chars). Full code shown to admins only at generation/regeneration.
+
+## 2.3 Flow (one screen, minimal taps)
+1. Single large auto-focused code field (`autocapitalize="characters"`, `autocomplete="one-time-code"`), **auto-submits at the 8th character** (keep a fallback button).
+2. **Unclaimed code:** one extra field, "Captain's name", asked once. Server binds the team to this device.
+3. **Same device returning** (cookie + stored deviceId match): skip everything, resume the game, even after refresh/crash/closed tab. Rolling session valid for the event (24 h, refreshed on activity).
+4. **Different device, code already claimed:** "This team's captain is already signed in on another phone. Only one phone per team. If that phone is lost or dead, ask an organiser to release the login." Never reveal the captain's name or team data. Wrong code: "That code isn't recognised. Check it against your slip."
+5. After login the same card flips to **"Set sail"**: one big button that in a single user gesture runs: unlock AudioContext (play silent buffer) → request geolocation → iOS `DeviceOrientationEvent.requestPermission()` → Screen Wake Lock → `POST /api/game/start`. Show a ruled checklist inked off as each step succeeds. Any denial shows the fix-it note and a "Try again" button that resets nothing.
+
+## 2.4 Server enforcement
+- `Team` fields: `accessCodeHash`, `codeHint`, `leaderName?`, `sessionId?`, `deviceId?`, `claimedAt?`, `lastLoginAt?`, `userAgent?`. No old passcode field.
+- `POST /api/auth/team/claim { code, deviceId, leaderName? }` returns `ok | needs_leader_name | already_claimed | invalid`. Client creates `deviceId` once (UUID in localStorage).
+- JWT (httpOnly, secure, sameSite cookie) holds `teamId` and `sid`. **Every REST request and socket handshake verifies `sid` against `Team.sessionId`.** Mismatch = 401 and forced sign-out.
+- **One socket per team:** a new valid socket disconnects the old one; stale `sid` is rejected.
+- Rate limits: 10 code attempts per IP per 5 min, 20 per code per hour, with "Too many tries, wait a minute." Log failed attempts for admins.
+- Progress, route and completions are unaffected by logout/login or release.
+
+## 2.5 Admin login controls (Team Manager)
+Per team: code hint, login status (Unclaimed / Claimed by captain / last seen), device summary ("Chrome on Android"), claimed time. Buttons:
+- **Release login:** clears session/device/captain, kills their socket, keeps progress.
+- **Regenerate code:** new code shown once (copyable), invalidates old code and session.
+- **Bulk create/generate:** paste a list of team names, all codes generated at once.
+- **Print code slips:** print stylesheet, 8 per page, each a small torn parchment ticket with logo, event name, `segment`, team name, big Plex Mono code, and "Captain only. One phone per team. Don't share this code."
+- **Download codes as CSV.** Confirmation dialogs and toasts. Admin activity log for releases and failed attempts.
+
+---
+
+# PART 3: DATA MODEL (Prisma, PostgreSQL)
+- `Admin` (id, username unique, passwordHash)
+- `Team` (id, name unique, members?, status NOT_STARTED|ACTIVE|FINISHED, startedAt, finishedAt, currentIndex, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, plus the login fields from 2.4)
+- `Checkpoint` (id, name, lat, lng, radiusM, hint?, isActive, createdAt)
+- `TeamRoute` (id, teamId, checkpointId, orderIndex) with `@@unique([teamId, orderIndex])` and `@@unique([teamId, checkpointId])`
+- `Completion` (id, teamId, checkpointId, completedAt, distanceAtCaptureM, accuracyM)
+- `Setting` (event status NOT_STARTED|LIVE|PAUSED|ENDED, default radius, accuracy gate)
+- `AdminLog` (id, type, teamId?, detail, createdAt)
+- **Seed:** 1 admin from secrets, 4 sample teams (codes printed once in the seed console output), 8 **placeholder** checkpoints near NITK Surathkal (about 13.011° N, 74.794° E) labelled "REPLACE WITH REAL LOCATIONS".
+
+# PART 4: GAME LOGIC (server is the source of truth)
+- **Route generation:** on first start, per-team shuffled route (Fisher-Yates with `crypto.randomInt`) in one DB transaction. Idempotent: never reshuffles. Best effort: no two teams share the same first checkpoint (when teams ≤ checkpoints) and no identical full orders.
+- **Capture (server-side Haversine):** distance to the team's CURRENT checkpoint only. Capture when `distance <= radiusM` AND `accuracy <= max(radiusM, 40)`. Require 2 consecutive qualifying pings, or 1 ping plus a client "arrive" event the server re-validates. Defaults suit campus tree cover: radius 30 m, both editable in admin "Game Settings".
+- On capture: write `Completion`, increment `currentIndex`, emit `checkpoint:captured` to the team (with NEXT target coordinates) and `admin:team:update` + `admin:completion:new` to admins. Last checkpoint sets FINISHED and emits `voyage:complete`. Never double-award.
+- **Never send future checkpoint coordinates to a team client.**
+- **Anti-cheat:** flag (don't drop) pings implying > 12 m/s, accuracy exactly 0, or identical repeating coordinates; flags show on the admin dashboard.
+- **Admin edits mid-game:** soft-delete via `isActive`; if a team's current checkpoint is deactivated, auto-advance and notify them.
+- **Event controls:** admin Start / Pause / End. While not live, teams see the waiting screen and captures are rejected.
+
+# PART 5: REST + SOCKET CONTRACT
+**REST:** `POST /api/auth/team/claim`, `POST /api/auth/admin/login`, `POST /api/auth/logout`, `GET /api/auth/me`; `POST /api/game/start` (idempotent), `GET /api/game/state`; admin CRUD `/api/admin/checkpoints` and `/api/admin/teams`; `POST /api/admin/teams/:id/{reset|release|regenerate-code}`; `POST /api/admin/teams/bulk`; `GET /api/admin/overview`; `GET/PATCH /api/admin/settings`; `POST /api/admin/event/{start|pause|end}`; `GET /api/admin/export.csv`; `GET /api/admin/codes.csv`; `GET /api/admin/logs`.
+**Socket:** JWT in handshake; teams join `team:{id}`, admins join `admins`.
+- Client → Server: `location:update {lat,lng,accuracy,heading?,ts}` (max 1 per 3 s per socket)
+- Server → Team: `checkpoint:captured`, `target:update`, `voyage:complete`, `event:status`, `error:flagged`, `session:revoked`
+- Server → Admins: `admin:snapshot`, `admin:team:update`, `admin:completion:new`
+- On reconnect the client re-syncs from `/api/game/state`.
+
+# PART 6: TEAM VIEW BEHAVIOR
+**6.1 The 39-Second Oracle:** continuous `watchPosition` (`enableHighAccuracy: true`, `maximumAge: 0`, `timeout: 20000`) writes to a ref, not React state. One 39,000 ms cycle: at each tick snapshot the latest position, compute bearing and distance, swing the needle. UI is deliberately frozen in between. The countdown is driven by `performance.now()`, not an incrementing `setInterval`, so it survives tab throttling. Compass uses `deviceorientationabsolute` / `webkitCompassHeading`; with no sensor, show text ("The Oracle says: North-East") plus a distance band instead of exact meters.
+
+**6.2 The Siren's Song (Web Audio, procedural, no files needed):** 2 detuned sine/triangle oscillators + low-gain filtered noise → lowpass BiquadFilter → GainNode, with a gentle LFO. Frontend Haversine on EVERY GPS update, independent of the 39 s UI refresh:
+- `> 100 m`: silent
+- `100 m → radius`: gain 0.05 → 1.0, frequency 220 → 880 Hz, filter cutoff and LFO rate rising on an ease-in curve
+All changes via `setTargetAtTime`/`linearRampToValueAtTime` (no clicks). Volume slider and mute. Auto-resume on `visibilitychange` or suspended context with a "Tap to hear the Sirens" prompt. Short chime on capture. Ink-wave visual intensity indicator.
+
+**6.3 Location → server:** emit every 7 s while visible. If movement < 5 m for 30 s, pause emits but send a heartbeat every 20 s.
+
+**6.4 Resilience:** offline banner, auto-reconnect, queued last position, state restored from the server after refresh/crash, "permission revoked mid-game" handling, small payloads for weak networks.
+
+# PART 7: ADMIN DASHBOARD
+- `/admin/login` (rate-limited), protected routes, role checks on client AND server.
+- **Checkpoint Manager:** table + modal (Name, Lat, Lng, Radius, Hint); range validation; "Use my current location" button; paste-from-Google-Maps `lat, lng` parser; edit/soft-delete with confirmation; warn if checkpoints < teams.
+- **Team Manager:** everything in 2.5.
+- **Event Controls + Game Settings:** Start/Pause/End; radius and accuracy gate.
+- **God's Eye View (live):** per team: status stamp, live lat/lng (6 decimals), accuracy, last seen ("12s ago", amber > 30 s, red > 90 s), current checkpoint, progress bar (i / N), suspicious flag, login status. Expandable row: completion log with timestamps and time per checkpoint, plus the team's full assigned route (admin-only). Sort/filter/search, summary stats (active, finished, stalled), live leaderboard (progress then fastest time), toast on every capture, toggleable Leaflet map with OpenStreetMap tiles (admins only), CSV export.
+
+# PART 8: NON-FUNCTIONAL
+- Mobile: design at 360px first; touch targets ≥ 48px; `100dvh`; safe-area insets; no horizontal scroll; no hover-only interactions; PWA manifest; portrait for team view.
+- Accessibility: AA contrast, ARIA labels on compass and timer, reduced-motion fallbacks.
+- Performance: no React re-render per GPS tick; smooth on a mid-range Android phone; Lighthouse mobile ≥ 85.
+- **GPS simulator:** hidden debug panel (`?debug=1` or admin-only) that spoofs positions and has a "walk toward target" button, so route → audio ramp → capture can be tested from a desk.
+- ESLint + Prettier, typed env parsing.
+
+# BUILD PLAN (one run; verify each milestone before the next)
+1. Scaffold, Prisma schema + migration + seed, Replit config, fonts, Tailwind tokens, `branding.ts`, `constants.ts`.
+2. Backend: auth (captain claim flow), Zod schemas, route generation, Haversine, capture service, Socket.io, REST, event controls.
+3. UI kit: PaperCard, StampButton, InkInput, ChartBackground, CompassRose, InkRing, FoundStamp, OrganiserTag, ship and corner-frame SVGs.
+4. Team screens: Splash/code login/Set sail, Oracle, Siren's Song, Arrival, Finale, Waiting, permission notes, location emitter.
+5. Admin: shell, Checkpoint Manager, Team Manager (release, regenerate, slips, CSV), Event Controls, God's Eye View.
+6. Polish, remove any leftover old styles, run all checks below, write the README.
+
+# VERIFY BEFORE FINISHING
+- Screenshot every screen at **360×800** and **1280×800**; compare to the poster for mood (sepia, serif, no glows). Confirm the splash title doesn't clip.
+- Login test with 2 browsers: first claims and works; second is blocked; admin "Release" lets the second in and kicks the first; refresh on the first resumes without re-entering the code.
+- Run an end-to-end test with 2 simulated teams: different routes, audio ramp, capture, live admin updates, pause/resume event.
+- Confirm no future-checkpoint coordinates appear in a team client's network traffic.
+- Grep the repo for "PhoenixX", "Odyssey: The Chase" and "ODECEEE: The Odyssey". None may remain.
+- Check contrast, 48px targets and page weight.
+- If anything is ambiguous, choose the safest default, state it in one line, and continue without stopping to ask.
+
+# README (deliverable)
+Replit setup (Secrets, Postgres), Reserved VM deploy, how to replace placeholder checkpoints with real NITK spots (walk there, use "Use my current location"), how to generate and print code slips, how to release a captain's login, and an event-day checklist: phone charged, location permission "While using the app", precise location ON (iOS), battery saver OFF (Android), keep the screen on, volume up, plus a rain-day fallback tip.

@@ -39,6 +39,7 @@ try {
         data: {
           name,
           passcodeHash: await bcrypt.hash(randomBytes(8).toString("hex").toUpperCase(), 12),
+          codeHint: "",
           members: null,
         },
       });

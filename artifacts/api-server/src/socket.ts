@@ -382,11 +382,15 @@ export function attachGameSockets(server: HttpServer) {
       void prisma.team
         .findUnique({
           where: { id: user.id },
-          select: { sessionVersion: true },
+          select: { sessionVersion: true, deviceId: true },
         })
         .then((team) => {
-          if (!team || team.sessionVersion !== user.sessionVersion) {
-            next(new Error("Team session has been reset"));
+          if (
+            !team ||
+            team.sessionVersion !== user.sessionVersion ||
+            team.deviceId !== user.deviceId
+          ) {
+            next(new Error("Captain session is no longer active"));
             return;
           }
           (socket as ClientSocket).data.odysseyUser = user;

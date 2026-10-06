@@ -19,6 +19,8 @@ import {
   PauseEventResponse,
   ResetTeamParams,
   ResetTeamResponse,
+  ReleaseTeamLoginParams,
+  ReleaseTeamLoginResponse,
   StartEventResponse,
   UpdateCheckpointBody,
   UpdateCheckpointParams,
@@ -179,6 +181,7 @@ router.post("/admin/teams", async (req, res): Promise<void> => {
         name,
         members: parsed.data.members ?? null,
         passcodeHash: await createPasscodeHash(passcode),
+        codeHint: passcode.replaceAll("-", "").slice(0, 2),
       },
     });
     const detail = await loadAdminTeam(team.id);
@@ -229,12 +232,13 @@ router.post("/admin/teams/bulk", async (req, res): Promise<void> => {
     provisioned.map(async (item) => ({
       ...item,
       passcodeHash: await createPasscodeHash(item.passcode),
+      codeHint: item.passcode.replaceAll("-", "").slice(0, 2),
     })),
   );
   try {
     const created = await prisma.$transaction(
-      hashed.map(({ name, members, passcodeHash }) =>
-        prisma.team.create({ data: { name, members, passcodeHash }, select: { id: true } }),
+      hashed.map(({ name, members, passcodeHash, codeHint }) =>
+        prisma.team.create({ data: { name, members, passcodeHash, codeHint }, select: { id: true } }),
       ),
     );
     const results = await Promise.all(
@@ -336,6 +340,12 @@ router.post("/admin/teams/:id/reset", async (req, res): Promise<void> => {
       where: { id: existing.id },
       data: {
         passcodeHash: await createPasscodeHash(passcode),
+        codeHint: passcode.replaceAll("-", "").slice(0, 2),
+        deviceId: null,
+        leaderName: null,
+        claimedAt: null,
+        lastLoginAt: null,
+        userAgent: null,
         status: "NOT_STARTED",
         sessionVersion: { increment: 1 },
         startedAt: null,
@@ -358,6 +368,75 @@ router.post("/admin/teams/:id/reset", async (req, res): Promise<void> => {
   const response = ResetTeamResponse.parse({ team: detail, passcode });
   await publishTeamUpdate(existing.id);
   res.json(response);
+});
+
+router.post("/admin/teams/:id/release-login", async (req, res): Promise<void> => {
+  const params = ReleaseTeamLoginParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  try {
+    await prisma.team.update({
+      where: { id: params.data.id },
+      data: {
+        deviceId: null,
+        leaderName: null,
+        claimedAt: null,
+        lastLoginAt: null,
+        userAgent: null,
+        sessionVersion: { increment: 1 },
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      res.status(404).json({ error: "Team not found." });
+      return;
+    }
+    throw error;
+  }
+  disconnectTeamSessions(params.data.id);
+  await publishTeamUpdate(params.data.id);
+  res.json(ReleaseTeamLoginResponse.parse({ ok: true }));
+});
+
+router.post("/admin/teams/:id/regenerate-code", async (req, res): Promise<void> => {
+  const params = ResetTeamParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const passcode = await createProvisioningPasscode();
+  let team;
+  try {
+    team = await prisma.team.update({
+      where: { id: params.data.id },
+      data: {
+        passcodeHash: await createPasscodeHash(passcode),
+        codeHint: passcode.replaceAll("-", "").slice(0, 2),
+        deviceId: null,
+        leaderName: null,
+        claimedAt: null,
+        lastLoginAt: null,
+        userAgent: null,
+        sessionVersion: { increment: 1 },
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      res.status(404).json({ error: "Team not found." });
+      return;
+    }
+    throw error;
+  }
+  disconnectTeamSessions(team.id);
+  const detail = await loadAdminTeam(team.id);
+  if (!detail) {
+    res.status(500).json({ error: "Could not reload the team." });
+    return;
+  }
+  await publishTeamUpdate(team.id);
+  res.json(ResetTeamResponse.parse({ team: detail, passcode }));
 });
 
 router.get("/admin/overview", async (_req, res): Promise<void> => {

@@ -1,18 +1,24 @@
 {
-  "name": "ODECEEE · The Odyssey",
-  "short_name": "The Odyssey",
-  "description": "A no-map GPS scavenger hunt across the NITK campus, presented by IET NITK.",
+  "name": "WATT A PLAY 3.0: THE ODECEEE",
+  "short_name": "WATT A PLAY 3.0",
+  "description": "The Odyssey · Treasure Hunt, presented by IET NITK.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#050B1F",
-  "theme_color": "#050B1F",
+  "background_color": "#E8D6B0",
+  "theme_color": "#E8D6B0",
   "icons": [
     {
-      "src": "/favicon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/branding/iet-nitk-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/branding/iet-nitk-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

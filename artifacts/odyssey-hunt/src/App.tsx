@@ -14,9 +14,9 @@ import {
   getHealthCheckQueryKey,
   getExportResultsQueryKey, getGetGameSettingsQueryKey, getGetGameStateQueryKey, getGetTeamsQueryKey,
   useAdminLogin, useBulkCreateTeams, useCreateCheckpoint, useCreateTeam, useDeactivateCheckpoint,
-  useDeleteTeam, useEndEvent, useExportResults, useGetAdminOverview, useGetCheckpoints,
+   useDeleteTeam, useEndEvent, useExportResults, useGetAdminOverview, useGetCheckpoints,
   useGetCurrentUser, useGetGameSettings, useGetGameState, useGetTeams, useHealthCheck, useLogout,
-  usePauseEvent, useResetTeam, useStartEvent, useStartVoyage, useTeamLogin,
+   usePauseEvent, useRegenerateTeamCode, useReleaseTeamLogin, useResetTeam, useStartEvent, useStartVoyage, useTeamLogin,
   useUpdateCheckpoint, useUpdateGameSettings, useUpdateTeam,
 } from '@workspace/api-client-react';
 import type { AdminOverview, AdminTeam, Checkpoint, Completion, GameSettings, GameState } from '@workspace/api-client-react';
@@ -27,10 +27,28 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
+import { BRAND } from '../../../shared/branding';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: true } } });
-const apiErr = (e: unknown) => (e instanceof Error ? e.message : 'The Fates have spoken. Please try again.');
+const apiErr = (e: unknown) => (typeof e === 'string' ? e : e instanceof Error ? e.message : 'The oracle could not complete that request. Please try again.');
 const statusLabel = (s?: string) => (s || 'NOT_STARTED').replaceAll('_', ' ').toLowerCase();
+const brandTitleParts = BRAND.event.split(/\s+/);
+const brandTitleLineOne = brandTitleParts.slice(0, 2).join(' ');
+const brandTitleLineTwo = brandTitleParts.slice(2).join(' ');
+const brandFileStem = `${BRAND.event.toLowerCase().replace(/ 3\.0$/, ' 3').replace(/[^a-z0-9]+/g, '-')}-${BRAND.subtitle.toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, '-')}`;
+const normalizeTeamCode = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+const formatTeamCode = (value: string) => {
+  const normalized = normalizeTeamCode(value);
+  return normalized.length > 4 ? `${normalized.slice(0, 4)}-${normalized.slice(4)}` : normalized;
+};
+function getOrCreateDeviceId() {
+  const storageKey = 'watt-a-play-device-id';
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) return existing;
+  const id = window.crypto.randomUUID();
+  window.localStorage.setItem(storageKey, id);
+  return id;
+}
 type Team = AdminTeam;
 const timeAgo = (date?: string | null) => {
   if (!date) return 'Not yet seen';
@@ -39,22 +57,24 @@ const timeAgo = (date?: string | null) => {
 };
 function Brand({ compact = false }: { compact?: boolean }) {
   return <div className="flex items-center gap-3">
-    <div className="grid h-10 w-10 place-items-center border border-[#d4af3766] text-[#f2d98a] font-cinzel text-lg">Ω</div>
-    <div><div className="font-cinzel text-[15px] tracking-[.18em] text-[#f2d98a]">ODECEEE</div>{!compact && <div className="font-cormorant text-[15px] italic leading-none text-[#b9c4d5]">The Odyssey · IET NITK</div>}</div>
+    <div className="grid h-11 w-11 shrink-0 place-items-center border border-[#9c7a4b] bg-[#f1e4c4] p-1.5">
+      <img src={BRAND.logoPath} alt={BRAND.organiser} className="h-full w-full object-contain mix-blend-multiply"/>
+    </div>
+    <div className="min-w-0">
+      {!compact && <div className="font-script text-lg leading-none text-[#5c4026]">{BRAND.presenter}</div>}
+      <div className="font-cinzel text-[13px] font-extrabold leading-tight tracking-[.06em] text-[#2a1b10]">{BRAND.event}</div>
+      {!compact && <div className="font-cormorant text-[12px] font-semibold tracking-[.15em] text-[#5c4026]">{BRAND.subtitle}</div>}
+    </div>
   </div>;
 }
 function LogoUploadSlot({small=false,slot='logo'}:{small?:boolean;slot?:string}) {
-  const [preview,setPreview]=useState('');
-  const [staticLogoAvailable,setStaticLogoAvailable]=useState(true);
-  useEffect(()=>()=>{if(preview)URL.revokeObjectURL(preview);},[preview]);
-  return <label className={`relative flex shrink-0 cursor-pointer items-center justify-center overflow-hidden border border-dashed border-[#d4af3766] bg-[#d4af3708] text-[#b9c4d5] ${small?'h-12 w-12':'h-12 w-[148px]'}`} title="Upload a logo preview, or replace public/branding/iet-nitk-logo.svg">
-    {preview?<img src={preview} alt="Uploaded IET NITK logo preview" className="h-full w-full object-contain p-1"/>:staticLogoAvailable?<img src="/branding/iet-nitk-logo.svg" alt="IET NITK logo" className="h-full w-full object-contain p-1" onError={()=>setStaticLogoAvailable(false)}/>:<span className="flex items-center gap-1.5 text-center text-[8px] uppercase leading-tight tracking-[.1em]"><Upload size={12}/>{small?'LOGO':'IET NITK logo slot'}</span>}
-    <input type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="Upload IET NITK logo" onChange={e=>{const file=e.currentTarget.files?.[0];if(file){if(preview)URL.revokeObjectURL(preview);setPreview(URL.createObjectURL(file));}}} data-testid={`input-iet-logo-upload-${slot}`}/>
-  </label>;
+  return <div className={`flex shrink-0 items-center justify-center border border-[#9c7a4b] bg-[#f1e4c4] p-1.5 ${small?'h-11 w-11':'h-12 w-[148px]'}`} title={BRAND.organiser}>
+    <img src={BRAND.logoPath} alt={BRAND.organiser} className="h-full w-full object-contain mix-blend-multiply" data-brand-slot={slot}/>
+  </div>;
 }
 function Starfield() { return <div aria-hidden className="pointer-events-none fixed inset-0 starfield opacity-50" />; }
 function Header({ label = 'THE ODYSSEY' }: { label?: string }) {
-  return <header className="relative z-10 flex items-center justify-between border-b border-[#d4af3725] px-5 py-4 sm:px-8"><Brand /><span className="hidden font-cinzel text-[10px] tracking-[.24em] text-[#d4af37aa] sm:block">{label}</span><LogoUploadSlot small slot="team-header"/></header>;
+  return <header className="relative z-10 flex items-center justify-between border-b border-[#9c7a4b80] px-5 py-4 sm:px-8"><Brand /><span className="hidden font-cinzel text-[10px] tracking-[.18em] text-[#5c4026] sm:block">{label}</span><LogoUploadSlot small slot="team-header"/></header>;
 }
 function ErrorNotice({ error, retry }: { error: unknown; retry?: () => void }) {
   return <div className="border border-[#c1440e80] bg-[#c1440e16] p-4 text-sm text-[#f2b69e]" role="alert" data-testid="status-error"><div className="font-cinzel">The Fates Have Spoken</div><p className="mt-1">{apiErr(error)}</p>{retry && <button className="mt-3 inline-flex min-h-10 items-center gap-2 underline" onClick={retry} data-testid="button-retry"><RefreshCw size={14}/> Try again</button>}</div>;
@@ -68,6 +88,16 @@ function PageTitle({ eyebrow, title, detail }: { eyebrow: string; title: string;
 function GoldButton({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button {...props} className={`gold-button flex w-full items-center justify-center gap-2 rounded-sm px-5 ${props.className || ''}`} />;
 }
+function TallShip() {
+  return <svg className="tall-ship" viewBox="0 0 560 230" role="img" aria-label="Engraved tall ship illustration">
+    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+      <path strokeWidth="4" d="M36 190q228 27 485-4l-54 26q-178 18-367-2zM130 190l12-131m94 134V22m111 136-4-116m-93 0 80 27m-93-2-75 28m99-56-68-34m70 1 72-34"/>
+      <path strokeWidth="2.5" d="m139 67-4 101-62-22zm-1 10-47 56m45-34-56 32m157-119 4 124-79-22zm3 10 67 80m-65-52-76 31m151-94-2 102-61-22zm0 18 48 61m-47-36-58 26m150-81 8 79-44-11zm4 16 31 42m-31-24-46 19M105 187l20-41m51 44 20-41m58 43 17-42m44 42 14-35m53 37 19-31m-278-7 256 8m-179-119 18 10m-20 18 31 5m-25 17 28 4m-95 9 20 10m-20 15 20 6m-21 14 19 4m117-109 20 9m-18 18 21 6m-22 14 20 5m-75 17 22 8m-22 13 21 6m-22 12 21 4"/>
+      <path strokeWidth="1.4" d="M62 198q218 18 419-4M147 59 115 39m137-15 40-19m69 41 39-18M196 32l-34-19m113 33 39-21M122 85l-32-16m165-26 32 3m-117 52-32-3m197 3 28-10m-115 29 27 9m-179 10 25 9m309 41 45 7M82 185l-27-9m349-70 37-13M221 135l27 9m-64 27 28 7m97-39 28 8"/>
+      <path strokeWidth="1" d="M35 219h474M53 225h450M110 188l-26 29m117-29-20 29m119-29-15 29m92-30-8 28M122 196h278m-258 9h224"/>
+    </g>
+  </svg>;
+}
 function App() {
   const [online,setOnline]=useState(true);
   const [secureContext,setSecureContext]=useState(true);
@@ -78,6 +108,20 @@ function App() {
     window.addEventListener('online',updateOnline);
     window.addEventListener('offline',updateOnline);
     return()=>{window.removeEventListener('online',updateOnline);window.removeEventListener('offline',updateOnline);};
+  },[]);
+  useEffect(()=>{
+    document.title = `${BRAND.event}: ${BRAND.subtitle}`;
+    const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
+    const ogTitle = document.querySelector<HTMLMetaElement>('meta[property="og:title"]');
+    const ogDescription = document.querySelector<HTMLMetaElement>('meta[property="og:description"]');
+    const twitterTitle = document.querySelector<HTMLMetaElement>('meta[name="twitter:title"]');
+    const descriptionText = `${BRAND.segment}, presented by ${BRAND.organiser}.`;
+    if(description) description.content = descriptionText;
+    if(ogTitle) ogTitle.content = document.title;
+    if(ogDescription) ogDescription.content = descriptionText;
+    if(twitterTitle) twitterTitle.content = document.title;
+    const twitterDescription = document.querySelector<HTMLMetaElement>('meta[name="twitter:description"]');
+    if(twitterDescription) twitterDescription.content = descriptionText;
   },[]);
   return <QueryClientProvider client={queryClient}><TooltipProvider>
     {(!online||!secureContext)&&<div className="fixed inset-x-0 top-0 z-[100] border-b border-[#d4af3770] bg-[#07152fee] px-4 py-2 text-center text-xs text-[#f2d98a]" role={secureContext?'status':'alert'} aria-live="polite" data-testid="status-app-environment">
@@ -102,38 +146,70 @@ function TeamEntry() {
   const health = useHealthCheck({ query: { queryKey: getHealthCheckQueryKey(), refetchInterval: 30000, retry: false } });
   const current = useGetCurrentUser({ query: { queryKey: getGetCurrentUserQueryKey(), retry: false } });
   const login = useTeamLogin();
-  const [teamName, setTeamName] = useState('');
-  const [passcode, setPasscode] = useState('');
+  const [accessCode, setAccessCode] = useState('');
+  const [captainName, setCaptainName] = useState('');
+  const [needsCaptainName, setNeedsCaptainName] = useState(false);
   const [error, setError] = useState('');
-  const [showCode, setShowCode] = useState(false);
+  const submittedCode = useRef('');
   const eventState = useGetGameState({ query: { queryKey: getGetGameStateQueryKey(), enabled: !!current.data?.user && current.data.user.role === 'TEAM', retry: false, refetchInterval: 12000 } });
   useEffect(() => { if (current.data?.user?.role === 'TEAM') setLocation('/voyage'); }, [current.data, setLocation]);
-  const submit = async (e: FormEvent) => { e.preventDefault(); setError(''); try { await login.mutateAsync({ data: { teamName: teamName.trim(), passcode: passcode.trim() } }); await queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() }); setLocation('/voyage'); } catch (e) { setError(apiErr(e)); } };
+  const submit = async (e?: FormEvent, rawCode = accessCode) => {
+    e?.preventDefault();
+    const code = normalizeTeamCode(rawCode);
+    if(code.length !== 8 || login.isPending) return;
+    const submissionKey = `${code}|${needsCaptainName ? captainName.trim() : ''}`;
+    if(submittedCode.current === submissionKey) return;
+    submittedCode.current = submissionKey;
+    setError('');
+    try {
+      await login.mutateAsync({
+        data: {
+          code,
+          deviceId: getOrCreateDeviceId(),
+          ...(needsCaptainName ? { leaderName: captainName.trim() } : {}),
+        },
+      });
+      await queryClient.invalidateQueries({ queryKey: getGetCurrentUserQueryKey() });
+      setLocation('/voyage');
+    } catch (e) {
+      const responseCode = (e as { data?: { code?: string } })?.data?.code;
+      if(responseCode === 'NEEDS_LEADER_NAME') {
+        setNeedsCaptainName(true);
+        submittedCode.current = `${code}|`;
+      } else {
+        submittedCode.current = '';
+        setError(apiErr(e));
+      }
+    }
+  };
   const waiting = eventState.data && eventState.data.eventStatus !== 'ACTIVE';
-  return <main className="relative min-h-[100dvh] overflow-hidden px-5 pb-12 pt-[max(28px,env(safe-area-inset-top))]">
-    <Header label="A CAMPUS ODYSSEY"/>
-    <div className="relative z-10 mx-auto grid min-h-[calc(100dvh-90px)] max-w-5xl items-center gap-10 py-8 md:grid-cols-[1.08fr_.92fr]">
-      <section className="text-center md:text-left">
-        <div className="mx-auto mb-8 grid h-20 w-20 place-items-center border border-[#d4af3780] text-[#d4af37] md:mx-0"><Compass size={37} strokeWidth={1}/></div>
-        <p className="label text-[#d4af37]">NITK · SURATHKAL</p><h1 className="mt-3 font-cinzel text-4xl leading-tight tracking-[.06em] text-[#ede6d6] sm:text-6xl">ODECEEE</h1>
-        <p className="mt-1 font-cormorant text-3xl italic text-[#f2d98a]">The Odyssey</p>
-        <p className="mx-auto mt-6 max-w-md font-cormorant text-xl leading-relaxed text-[#bdc7d6] md:mx-0">An old mystery is waiting beneath familiar skies. Gather your crew. Follow the oracle. Find your way.</p>
-        <div className="mt-8 hidden max-w-md border-l border-[#d4af37] pl-4 text-left md:block"><p className="font-cormorant text-lg italic text-[#f2d98a]">“The path appears only to those who begin.”</p><p className="mt-1 label">39-second oracle · No maps, only instinct</p></div>
+  return <main className="relative min-h-[100dvh] overflow-hidden px-5 pb-12 pt-[max(18px,env(safe-area-inset-top))]">
+    <Header label={BRAND.segment.toUpperCase()}/>
+    <div className="poster-layout relative z-10 mx-auto grid max-w-6xl items-center gap-8 py-7 md:min-h-[calc(100dvh-105px)] md:grid-cols-[1.1fr_.9fr] md:gap-12 md:py-10">
+      <section className="poster-copy relative pb-28 text-left md:pb-16">
+        <div className="poster-corner-frame" aria-hidden="true"><span/><span/><span/><span/></div>
+        <p className="font-script text-[clamp(1.3rem,5vw,2.1rem)] leading-none text-[#5c4026]">{BRAND.presenter}</p>
+        <h1 className="poster-title mt-3 font-cinzel uppercase leading-[.95] tracking-[-.045em] text-[#2a1b10]" aria-label={BRAND.event}><span>{brandTitleLineOne}</span>{brandTitleLineTwo&&<span>{brandTitleLineTwo}</span>}</h1>
+        <p className="mt-4 font-cinzel text-sm font-semibold tracking-[.24em] text-[#5c4026] sm:text-base">{BRAND.subtitle}</p>
+        <p className="mt-3 font-cormorant text-xl italic text-[#5c4026]">{BRAND.segment}</p>
+        <p className="mt-6 max-w-md border-l-2 border-[#8b2e1f] pl-4 font-cormorant text-lg leading-relaxed text-[#2a1b10]">One code for the captain. No map to follow. Listen for the Siren and trust the 39-Second Oracle.</p>
+        <TallShip/>
       </section>
-      <section className="panel relative mx-auto w-full max-w-md p-6 sm:p-8">
-        <div className="mb-5 flex items-center justify-between"><div><p className="label text-[#d4af37]">YOUR CREW AWAITS</p><h2 className="mt-1 font-cinzel text-xl">Enter the voyage</h2></div><Waves className="text-[#d4af37]" size={22}/></div>
+      <section className="paper-card relative mx-auto w-full max-w-md p-6 sm:p-8">
+        <div className="mb-5 flex items-start justify-between gap-3"><div><p className="label">{BRAND.organiser.toUpperCase()} · CAPTAIN ACCESS</p><h2 className="mt-1 font-cinzel text-xl">Enter your team code</h2></div><Compass className="mt-1 shrink-0 text-[#5c4026]" size={24} strokeWidth={1.3}/></div>
         <div className="mb-4 flex min-h-6 items-center gap-2 text-[10px] uppercase tracking-[.12em]" role="status" aria-live="polite" data-testid="status-service-health"><span className={`h-1.5 w-1.5 rounded-full ${health.isError?'bg-[#c1440e]':health.isLoading?'bg-[#d4af37]':'bg-[#73c999]'}`}/>{health.isError?'Oracle connection unavailable':health.isLoading?'Checking the oracle connection':'Oracle connection ready'}{health.isError&&<button type="button" className="ml-auto min-h-10 px-2 text-[#f2d98a] underline" onClick={()=>void health.refetch()} data-testid="button-retry-service-health">Retry</button>}</div>
-        {waiting && <div className="mb-5 border border-[#d4af3755] bg-[#d4af3710] p-4" data-testid="status-event-waiting"><p className="font-cinzel text-sm text-[#f2d98a]">The Gods Are Still Sleeping</p><p className="mt-1 text-xs leading-relaxed text-[#b9c4d5]">Your pass is ready. The voyage begins when the volunteers awaken the event.</p></div>}
+        {waiting && <div className="mb-5 border border-[#9c7a4b] bg-[#e8d6b0] p-4" data-testid="status-event-waiting"><p className="font-cinzel text-sm">The hunt hasn’t started yet</p><p className="mt-1 text-xs leading-relaxed">Hold position. Your crew can set sail when the volunteers open the event.</p></div>}
         {error && <div className="mb-4"><ErrorNotice error={error}/></div>}
-        <form onSubmit={submit} className="space-y-4">
-          <label className="block"><span className="label mb-2 block">Team name</span><input required autoComplete="organization" className="field" placeholder="Your crew's name" value={teamName} onChange={e=>setTeamName(e.target.value)} data-testid="input-team-name"/></label>
-          <label className="block"><span className="label mb-2 block">Passcode</span><span className="relative block"><input required autoComplete="one-time-code" className="field pr-12" placeholder="Enter your passcode" type={showCode?'text':'password'} value={passcode} onChange={e=>setPasscode(e.target.value)} data-testid="input-team-passcode"/><button type="button" className="absolute right-1 top-1 grid h-11 w-11 place-items-center text-[#b9c4d5]" onClick={()=>setShowCode(!showCode)} aria-label={showCode?'Hide passcode':'Show passcode'} data-testid="button-toggle-passcode">{showCode?<EyeOff size={17}/>:<Eye size={17}/>}</button></span></label>
-          <GoldButton type="submit" disabled={login.isPending} data-testid="button-begin-voyage">{login.isPending?'Opening the way…':'Begin Voyage'}<ArrowRight size={17}/></GoldButton>
+        <form onSubmit={(e)=>void submit(e)} className="space-y-4">
+          <label className="block"><span className="label mb-2 block">Team access code</span><input required autoFocus autoComplete="one-time-code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} inputMode="text" maxLength={9} className="field font-coordinate text-center text-2xl font-semibold tracking-[.22em]" placeholder="K7MQ-4XPD" value={accessCode} onChange={e=>{const formatted=formatTeamCode(e.target.value);setAccessCode(formatted);setError('');if(normalizeTeamCode(formatted).length===8&&!needsCaptainName)window.setTimeout(()=>void submit(undefined,formatted),0);}} aria-label="Eight-character team access code" data-testid="input-team-access-code"/></label>
+          {needsCaptainName&&<label className="block"><span className="label mb-2 block">Captain’s name</span><input required autoComplete="name" autoFocus className="field" placeholder="Name of the captain" value={captainName} onChange={e=>{setCaptainName(e.target.value);submittedCode.current='';}} data-testid="input-captain-name"/></label>}
+          <GoldButton type="submit" disabled={login.isPending||normalizeTeamCode(accessCode).length!==8||(needsCaptainName&&!captainName.trim())} data-testid="button-begin-voyage">{login.isPending?'Checking the code…':needsCaptainName?'Claim this phone':'Continue'}<ArrowRight size={17}/></GoldButton>
         </form>
-        <div className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-[#91a0b7]"><Shield size={14} className="mt-0.5 shrink-0 text-[#d4af37]"/>Passcodes are issued by IET NITK volunteers. Keep yours within your team.</div>
+        <div className="mt-5 flex items-start gap-2 border-t border-[#9c7a4b80] pt-4 text-xs leading-relaxed text-[#5c4026]"><Shield size={14} className="mt-0.5 shrink-0"/>Captain only. Keep this phone with your team. Ask an IET NITK organiser if you lose your code or phone.</div>
+        <div className="organiser-tag mt-5 flex items-center gap-3 border border-[#9c7a4b] bg-[#e8d6b0] p-2"><LogoUploadSlot slot="login-organiser"/><span className="label">Organised by<br/><strong className="mt-1 block text-[#2a1b10]">{BRAND.organiser}</strong></span></div>
       </section>
     </div>
-    <div className="wave"/><footer className="relative z-10 text-center font-cormorant text-base italic text-[#91a0b7]">Presented by IET NITK <span className="mx-2 text-[#d4af37]">·</span> Walk together. Trust the tide.</footer>
+    <footer className="relative z-10 text-center font-cormorant text-base italic text-[#5c4026]">{BRAND.event} · {BRAND.subtitle}</footer>
   </main>;
 }
 
@@ -383,10 +459,10 @@ function AdminShell({children,title}:{children:ReactNode;title:string}) {
   },()=>{void qc.invalidateQueries({queryKey:getGetTeamsQueryKey()});void qc.invalidateQueries({queryKey:getGetAdminOverviewQueryKey()});});
   useEffect(()=>{if(user.isError)setLocation('/admin/login');else if(user.data?.user?.role==='TEAM')setLocation('/');},[user.isError,user.data,setLocation]);
   const signout=()=>logout.mutate(undefined,{onSuccess:()=>{void qc.invalidateQueries({queryKey:getGetCurrentUserQueryKey()});setLocation('/admin/login');}});
-  return <div className="relative min-h-[100dvh] md:flex">
+  return <div className="admin-shell relative min-h-[100dvh] md:flex">
     <aside className="hidden w-[248px] shrink-0 border-r border-[#d4af3725] bg-[#071229] p-5 md:flex md:flex-col"><div className="mb-8"><Brand/><div className="mt-5" data-testid="logo-upload-slot"><LogoUploadSlot slot="admin-sidebar"/></div></div><p className="label mb-3 pl-3">VOLUNTEER CONSOLE</p><nav className="space-y-1">{adminNav.map(n=><Link href={n.href} key={n.href} className={`nav-item ${title===n.label?'active':''}`} data-testid={`link-admin-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={17}/>{n.label}</Link>)}</nav><div className="mt-auto border-t border-[#d4af3725] pt-4"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#d4af3750] font-cinzel text-[#f2d98a]">{user.data?.user?.name?.slice(0,1)||'I'}</div><div><div className="text-sm">{user.data?.user?.name||'IET Volunteer'}</div><div className="label">EVENT CREW</div></div></div><button onClick={signout} className="min-h-11 w-full text-left text-sm text-[#b9c4d5]" data-testid="button-admin-signout">Sign out</button></div></aside>
     <div className="min-w-0 flex-1">
-       <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-[#d4af3725] bg-[#050b1fee] px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button className="grid h-11 w-11 place-items-center text-[#f2d98a] md:hidden" onClick={()=>setMobile(!mobile)} aria-label="Open navigation" data-testid="button-mobile-menu">{mobile?<X/>:<Menu/>}</button><div className="md:hidden"><Brand compact/></div><span className="hidden font-cinzel text-sm tracking-widest md:block">ODECEEE <span className="text-[#8191a8]">/</span> {title.toUpperCase()}</span></div><div className="flex items-center gap-3"><span className={`hidden items-center gap-2 text-xs sm:flex ${adminSocket.connection==='connected'?'text-[#a7d7bd]':'text-[#d4af37]'}`} data-testid="status-admin-socket"><span className={`h-2 w-2 rounded-full ${adminSocket.connection==='connected'?'bg-[#73c999]':'bg-[#d4af37]'}`}/>{adminSocket.connection==='connected'?'LIVE CONSOLE':'RECONNECTING'}</span><LogoUploadSlot small slot="admin-header"/><button onClick={signout} className="hidden min-h-10 text-xs text-[#b9c4d5] md:block" data-testid="button-signout-top">Sign out</button></div></header>
+        <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-[#d4af3725] bg-[#050b1fee] px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button className="grid h-11 w-11 place-items-center text-[#f2d98a] md:hidden" onClick={()=>setMobile(!mobile)} aria-label="Open navigation" data-testid="button-mobile-menu">{mobile?<X/>:<Menu/>}</button><div className="md:hidden"><Brand compact/></div><span className="hidden font-cinzel text-sm tracking-widest md:block">{BRAND.event} <span className="text-[#8191a8]">/</span> {title.toUpperCase()}</span></div><div className="flex items-center gap-3"><span className={`hidden items-center gap-2 text-xs sm:flex ${adminSocket.connection==='connected'?'text-[#a7d7bd]':'text-[#d4af37]'}`} data-testid="status-admin-socket"><span className={`h-2 w-2 rounded-full ${adminSocket.connection==='connected'?'bg-[#73c999]':'bg-[#d4af37]'}`}/>{adminSocket.connection==='connected'?'LIVE CONSOLE':'RECONNECTING'}</span><LogoUploadSlot small slot="admin-header"/><button onClick={signout} className="hidden min-h-10 text-xs text-[#b9c4d5] md:block" data-testid="button-signout-top">Sign out</button></div></header>
       {captureNotice&&<div className="fixed right-4 top-[76px] z-40 max-w-[calc(100vw-2rem)] border border-[#73c99970] bg-[#0a1f35] px-4 py-3 text-sm text-[#c3ead1] shadow-xl" role="status" aria-live="polite" data-testid="toast-checkpoint-captured"><span className="mr-2 text-[#f2d98a]">OFFERING ACCEPTED</span>{captureNotice}</div>}
       {mobile&&<nav className="relative z-20 grid grid-cols-2 gap-2 border-b border-[#d4af3725] bg-[#08152c] p-3 md:hidden">{adminNav.map(n=><Link key={n.href} href={n.href} className={`nav-item ${title===n.label?'active':''}`} onClick={()=>setMobile(false)} data-testid={`link-mobile-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={16}/>{n.label}</Link>)}<button onClick={signout} className="nav-item" data-testid="button-mobile-signout">Sign out</button></nav>}
       <main className="mx-auto max-w-[1500px] p-4 pb-12 sm:p-6 md:p-8">{children}</main>
@@ -471,25 +547,51 @@ function CheckpointsPage() {
 }
 function TeamsPage() {
   const qc=useQueryClient();const q=useGetTeams({query:{queryKey:getGetTeamsQueryKey(),refetchInterval:12000}});
-  const create=useCreateTeam();const bulk=useBulkCreateTeams();const update=useUpdateTeam();const del=useDeleteTeam();const reset=useResetTeam();
+  const create=useCreateTeam();const bulk=useBulkCreateTeams();const update=useUpdateTeam();const del=useDeleteTeam();const reset=useResetTeam();const release=useReleaseTeamLogin();const regenerate=useRegenerateTeamCode();
   const [name,setName]=useState('');const [members,setMembers]=useState('');const [bulkNames,setBulkNames]=useState('');const [editId,setEditId]=useState<string|null>(null);const [notice,setNotice]=useState<{title:string;items:{name:string;passcode:string}[]}|null>(null);const [error,setError]=useState('');const [busy,setBusy]=useState(false);const [tab,setTab]=useState<'single'|'bulk'>('single');const [search,setSearch]=useState('');
   const refresh=()=>qc.invalidateQueries({queryKey:getGetTeamsQueryKey()});
   const submitSingle=async(e:FormEvent)=>{e.preventDefault();setError('');setBusy(true);try{if(editId){await update.mutateAsync({id:editId,data:{name:name.trim(),members:members.trim()||null}});setNotice({title:'Crew details saved',items:[]});setEditId(null);}else{const r=await create.mutateAsync({data:{name:name.trim(),members:members.trim()||null}});setNotice({title:'Offering Accepted · Save this passcode now',items:[{name:r.team.name,passcode:r.passcode}]});}setName('');setMembers('');await refresh();}catch(e){setError(apiErr(e));}finally{setBusy(false);}};
   const submitBulk=async(e:FormEvent)=>{e.preventDefault();setError('');const names=bulkNames.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!names.length){setError('Add at least one team name, one per line.');return;}setBusy(true);try{const r=await bulk.mutateAsync({data:{names:names.join('\n')}});setNotice({title:`${r.length} crew passes issued · shown once`,items:r.map(x=>({name:x.team.name,passcode:x.passcode}))});setBulkNames('');await refresh();}catch(e){setError(apiErr(e));}finally{setBusy(false);}};
-  const issueReset=(team:AdminTeam)=>{if(!window.confirm(`Reset ${team.name}’s route and issue a new passcode?`))return;reset.mutate({id:team.id},{onSuccess:(r)=>{setNotice({title:'New passcode · shown once',items:[{name:r.team.name,passcode:r.passcode}]});void refresh();},onError:e=>setError(apiErr(e))});};
+  const issueReset=(team:AdminTeam)=>{if(!window.confirm(`Reset ${team.name}’s checkpoint progress and issue a new code? This cannot be undone.`))return;reset.mutate({id:team.id},{onSuccess:(r)=>{setNotice({title:'New code · shown once',items:[{name:r.team.name,passcode:r.passcode}]});void refresh();},onError:e=>setError(apiErr(e))});};
+  const issueRegenerate=(team:AdminTeam)=>{if(!window.confirm(`Issue a new code for ${team.name}? Their checkpoint progress stays unchanged, but the current phone will be signed out.`))return;regenerate.mutate({id:team.id},{onSuccess:(r)=>{setNotice({title:'New code issued · progress preserved · shown once',items:[{name:r.team.name,passcode:r.passcode}]});void refresh();},onError:e=>setError(apiErr(e))});};
+  const releaseLogin=(team:AdminTeam)=>{if(!window.confirm(`Release ${team.name}’s captain phone? Checkpoint progress and the access code stay unchanged.`))return;release.mutate({id:team.id},{onSuccess:()=>void refresh(),onError:e=>setError(apiErr(e))});};
   const remove=(team:AdminTeam)=>{if(!window.confirm(`Permanently remove ${team.name}?`))return;del.mutate({id:team.id},{onSuccess:()=>void refresh(),onError:e=>setError(apiErr(e))});};
   const copy=async(text:string)=>{try{await navigator.clipboard.writeText(text);}catch{setError('Clipboard unavailable. Select and copy the passcode manually.');}};
+  const downloadPasses=()=>{if(!notice?.items.length)return;const csv=[['event','team','access_code'],...notice.items.map(x=>[BRAND.event,x.name,x.passcode])].map(row=>row.map(value=>`"${value.replaceAll('"','""')}"`).join(',')).join('\r\n');const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${brandFileStem}-codes.csv`;link.click();URL.revokeObjectURL(url);};
   const visible=(q.data||[]).filter(t=>t.name.toLowerCase().includes(search.toLowerCase()));
   return <AdminShell title="Teams"><PageTitle eyebrow="CREW MANIFEST" title="Team manager" detail="Provision passes, track crews and keep every team ready for the crossing."/>
     {error&&<div className="mb-5"><ErrorNotice error={error}/></div>}
-    {notice&&<section className="mb-6 border border-[#d4af3775] bg-[#d4af3710] p-4 sm:p-5" data-testid="status-passcode-result"><div className="flex items-start justify-between gap-4"><div><p className="label text-[#d4af37]">PASSCODE SLIPS</p><h2 className="mt-1 font-cinzel text-lg text-[#f2d98a]">{notice.title}</h2></div><button onClick={()=>setNotice(null)} aria-label="Dismiss passcodes" className="grid h-10 w-10 place-items-center text-[#b9c4d5]" data-testid="button-dismiss-passcodes"><X size={17}/></button></div>{notice.items.length>0&&<><div className="mt-4 grid gap-2 sm:grid-cols-2">{notice.items.map((it,i)=><div key={`${it.name}-${i}`} className="flex items-center justify-between gap-3 border border-[#d4af3728] bg-[#07152f] p-3"><div className="min-w-0"><p className="truncate text-sm">{it.name}</p><code className="mt-1 block font-mono text-sm tracking-widest text-[#f2d98a]" data-testid={`text-passcode-${i}`}>{it.passcode}</code></div><button onClick={()=>void copy(`${it.name}\t${it.passcode}`)} className="grid h-11 w-11 shrink-0 place-items-center border border-[#31486d] text-[#f2d98a]" aria-label={`Copy ${it.name} passcode`} data-testid={`button-copy-passcode-${i}`}><Copy size={16}/></button></div>)}</div><p className="mt-3 text-xs text-[#b9c4d5]">These credentials are shown only now. Record them securely and distribute directly to the crew.</p><button onClick={()=>window.print()} className="mt-3 flex min-h-11 items-center gap-2 text-sm text-[#f2d98a] underline" data-testid="button-print-passcodes">Print passcode slips</button></>}</section>}
+     {notice&&<section className="passcode-notice mb-6 border border-[#d4af3775] bg-[#d4af3710] p-4 sm:p-5" data-testid="status-passcode-result">
+       <div className="passcode-screen-heading flex items-start justify-between gap-4"><div><p className="label text-[#d4af37]">TEAM ACCESS CODES</p><h2 className="mt-1 font-cinzel text-lg text-[#f2d98a]">{notice.title}</h2></div><button onClick={()=>setNotice(null)} aria-label="Dismiss codes" className="grid h-10 w-10 place-items-center text-[#b9c4d5]" data-testid="button-dismiss-passcodes"><X size={17}/></button></div>
+       {notice.items.length>0&&<>
+         <div className="print-pass-slips mt-4">{notice.items.map((it,i)=><article key={`${it.name}-${i}`} className="access-code-slip">
+           <header className="flex items-center gap-3 border-b border-[#9c7a4b] pb-2"><img src={BRAND.logoPath} alt={BRAND.organiser} className="h-10 w-16 object-contain"/><div><p className="font-script text-sm">{BRAND.presenter}</p><p className="font-cinzel text-sm font-bold">{BRAND.event}</p><p className="label">{BRAND.subtitle} · TEAM PASS</p></div></header>
+           <p className="mt-3 truncate font-cinzel text-sm">{it.name}</p><code className="mt-1 block font-coordinate text-2xl font-bold tracking-[.18em]" data-testid={`text-passcode-${i}`}>{it.passcode}</code><p className="mt-2 text-[10px] leading-relaxed">One code · one captain · one phone. Keep this code with your crew. Ask an IET NITK organiser if you lose access.</p>
+           <p className="mt-auto pt-2 text-[9px] uppercase tracking-wider">{BRAND.segment}</p>
+         </article>)}</div>
+         <div className="passcode-screen-controls">
+           <p className="mt-3 text-xs text-[#b9c4d5]">Codes are displayed once. Download or print these slips now, keep them private, and hand one to each team’s captain.</p>
+           <div className="mt-3 flex flex-wrap gap-4"><button onClick={downloadPasses} className="flex min-h-11 items-center gap-2 text-sm text-[#f2d98a] underline" data-testid="button-download-passcodes"><Download size={15}/>Download codes CSV</button><button onClick={()=>window.print()} className="flex min-h-11 items-center gap-2 text-sm text-[#f2d98a] underline" data-testid="button-print-passcodes">Print pass slips</button></div>
+         </div>
+       </>}
+     </section>}
     <div className="grid gap-6 xl:grid-cols-[400px_1fr]">
       <section className="panel p-4 sm:p-5"><div className="mb-5 flex items-center justify-between"><div><p className="label text-[#d4af37]">{editId?'EDIT CREW':'PROVISION'}</p><h2 className="mt-1 font-cinzel text-lg">{editId?'Update team':'Add teams'}</h2></div>{editId&&<button onClick={()=>{setEditId(null);setName('');setMembers('');}} className="grid h-10 w-10 place-items-center text-[#b9c4d5]" data-testid="button-cancel-team-edit"><X size={17}/></button>}</div>
         {!editId&&<div className="mb-4 grid grid-cols-2 gap-2"><button onClick={()=>setTab('single')} className={`min-h-11 border text-xs uppercase tracking-wider ${tab==='single'?'border-[#d4af37] text-[#f2d98a]':'border-[#31486d] text-[#91a0b7]'}`} data-testid="button-single-team-tab">Single team</button><button onClick={()=>setTab('bulk')} className={`min-h-11 border text-xs uppercase tracking-wider ${tab==='bulk'?'border-[#d4af37] text-[#f2d98a]':'border-[#31486d] text-[#91a0b7]'}`} data-testid="button-bulk-team-tab">Bulk add</button></div>}
         {editId||tab==='single'?<form onSubmit={submitSingle} className="space-y-3"><label className="block"><span className="label mb-1.5 block">Team name</span><input required maxLength={80} className="field" value={name} onChange={e=>setName(e.target.value)} placeholder="The Ithaca crew" data-testid="input-new-team-name"/></label><label className="block"><span className="label mb-1.5 block">Crew members <span className="normal-case tracking-normal text-[#8191a8]">optional</span></span><textarea maxLength={500} rows={3} className="field" value={members} onChange={e=>setMembers(e.target.value)} placeholder="Names or student IDs" data-testid="input-team-members"/></label><GoldButton type="submit" disabled={busy} data-testid="button-save-team">{busy?'Saving…':editId?'Save team':'Create team & issue pass'}<Plus size={16}/></GoldButton></form>:<form onSubmit={submitBulk} className="space-y-3"><label className="block"><span className="label mb-1.5 block">Team names · one per line</span><textarea required rows={7} className="field resize-y" value={bulkNames} onChange={e=>setBulkNames(e.target.value)} placeholder={'Aegean Runners\\nThe Returning Tide\\nCrew Three'} data-testid="input-bulk-team-names"/></label><p className="text-xs text-[#91a0b7]">Each crew receives its own one-time passcode.</p><GoldButton type="submit" disabled={busy} data-testid="button-bulk-create-teams">{busy?'Issuing passes…':'Create teams & issue passes'}<Users size={16}/></GoldButton></form>}
       </section>
       <section className="panel p-4 sm:p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-cinzel text-lg">Registered crews</h2><p className="mt-1 text-xs text-[#91a0b7]">{q.data?.length??0} teams in the manifest</p></div><label className="relative w-full sm:w-56"><Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8191a8]"/><input className="field min-h-10 pl-9 text-sm" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search crews" data-testid="input-search-teams"/></label></div>
-        {q.isLoading?<Loading/>:q.isError?<ErrorNotice error={q.error} retry={()=>void q.refetch()}/>:!visible.length?<div className="border border-dashed border-[#d4af3733] p-8 text-center"><Users className="mx-auto text-[#8191a8]"/><p className="mt-3 font-cormorant text-xl">{q.data?.length?'No crews found.':'No crews in the manifest yet.'}</p></div>:<div className="space-y-2">{visible.map(t=><article key={t.id} className="border border-[#d4af3720] bg-[#08162d] p-3 sm:p-4" data-testid={`row-team-${t.id}`}><div className="flex flex-wrap items-center gap-3"><div className="min-w-0 flex-1"><p className="truncate font-medium">{t.name}</p><p className="mt-1 text-xs text-[#91a0b7]">{t.members||'Crew members not listed'}</p></div><span className="rounded-full border border-[#d4af372b] px-2.5 py-1 text-[10px] uppercase text-[#f2d98a]">{statusLabel(t.status)}</span><div className="flex w-full flex-wrap gap-2 border-t border-[#d4af3717] pt-2 sm:w-auto sm:border-0 sm:pt-0"><button onClick={()=>{setEditId(t.id);setName(t.name);setMembers(t.members||'');setTab('single');}} className="min-h-10 px-2 text-xs text-[#f2d98a] underline" data-testid={`button-edit-team-${t.id}`}>Edit</button><button onClick={()=>issueReset(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#b9c4d5] underline" data-testid={`button-reset-team-${t.id}`}><RotateCcw size={13}/>Reset / new pass</button><button onClick={()=>remove(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#f0b39b] underline" data-testid={`button-delete-team-${t.id}`}><Trash2 size={13}/>Delete</button></div></div><div className="mt-3 h-1 overflow-hidden bg-[#1a2d4b]"><div className="h-full bg-[#d4af37]" style={{width:`${t.totalCheckpoints?Math.min(100,t.currentIndex/t.totalCheckpoints*100):0}%`}}/></div></article>)}</div>}
+         {q.isLoading ? <Loading/> : q.isError ? <ErrorNotice error={q.error} retry={()=>void q.refetch()}/> : !visible.length ? <div className="border border-dashed border-[#d4af3733] p-8 text-center"><Users className="mx-auto text-[#8191a8]"/><p className="mt-3 font-cormorant text-xl">{q.data?.length ? 'No crews found.' : 'No crews in the manifest yet.'}</p></div> : <div className="space-y-2">{visible.map(t => <article key={t.id} className="border border-[#d4af3720] bg-[#08162d] p-3 sm:p-4" data-testid={`row-team-${t.id}`}>
+           <div className="flex flex-wrap items-center gap-3"><div className="min-w-0 flex-1"><p className="truncate font-medium">{t.name}</p><p className="mt-1 text-xs text-[#91a0b7]">{t.members || 'Crew members not listed'}</p><p className="mt-2 text-xs">Code · <code className="font-coordinate tracking-wider">{t.codeHint || '—'}••••••</code> · {t.claimedAt ? `Captain ${t.leaderName || 'name not recorded'}` : 'Unclaimed'}</p><p className="mt-1 text-[10px] text-[#91a0b7]">Last seen: {timeAgo(t.lastLoginAt)}{t.userAgent ? ` · ${t.userAgent.slice(0, 55)}` : ''}</p></div>
+             <span className="rounded-full border border-[#d4af372b] px-2.5 py-1 text-[10px] uppercase text-[#f2d98a]">{statusLabel(t.status)}</span>
+             <div className="flex w-full flex-wrap gap-2 border-t border-[#d4af3717] pt-2 sm:w-auto sm:border-0 sm:pt-0">
+               <button onClick={()=>{setEditId(t.id);setName(t.name);setMembers(t.members||'');setTab('single');}} className="min-h-10 px-2 text-xs text-[#f2d98a] underline" data-testid={`button-edit-team-${t.id}`}>Edit</button>
+               <button onClick={()=>issueRegenerate(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#f2d98a] underline" data-testid={`button-regenerate-team-code-${t.id}`}>New code · keep progress</button>
+               {t.claimedAt&&<button onClick={()=>releaseLogin(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#f2d98a] underline" data-testid={`button-release-team-login-${t.id}`}>Release phone</button>}
+               <button onClick={()=>issueReset(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#b9c4d5] underline" data-testid={`button-reset-team-${t.id}`}><RotateCcw size={13}/>Reset progress</button>
+               <button onClick={()=>remove(t)} className="flex min-h-10 items-center gap-1 px-2 text-xs text-[#f0b39b] underline" data-testid={`button-delete-team-${t.id}`}><Trash2 size={13}/>Delete</button>
+             </div></div><div className="mt-3 h-1 overflow-hidden bg-[#1a2d4b]"><div className="h-full bg-[#d4af37]" style={{width:`${t.totalCheckpoints ? Math.min(100,t.currentIndex/t.totalCheckpoints*100) : 0}%`}}/></div>
+           </article>)}</div>}
       </section>
     </div>
   </AdminShell>;
@@ -503,7 +605,7 @@ function SettingsPage() {
   const invalidate=()=>{void qc.invalidateQueries({queryKey:getGetGameSettingsQueryKey()});void qc.invalidateQueries({queryKey:getGetAdminOverviewQueryKey()});};
   const save=async(e:FormEvent)=>{e.preventDefault();setMessage('');setError('');const v={defaultRadiusM:Number(values.defaultRadiusM),accuracySlackM:Number(values.accuracySlackM),maxAccuracyM:Number(values.maxAccuracyM)};if(v.defaultRadiusM<5||v.defaultRadiusM>200||v.accuracySlackM<0||v.accuracySlackM>200||v.maxAccuracyM<10||v.maxAccuracyM>300){setError('One or more values are outside the permitted range.');return;}try{await update.mutateAsync({data:v});invalidate();setMessage('Offering Accepted · Game settings saved.');}catch(e){setError(apiErr(e));}};
   const eventAction=async(action:'start'|'pause'|'end')=>{setError('');setMessage('');if(action==='end'&&!window.confirm('End the event for every team? This cannot be undone.'))return;try{if(action==='start')await start.mutateAsync();else if(action==='pause')await pause.mutateAsync();else await end.mutateAsync();invalidate();setMessage(action==='start'?'The event is now open.':action==='pause'?'The event is paused.':'The event has ended.');}catch(e){setError(apiErr(e));}};
-  const exportCsv=async()=>{setError('');try{const {data}=await exportQuery.refetch();if(data){const blob=new Blob([data],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='odeceee-results.csv';a.click();URL.revokeObjectURL(url);}}catch(e){setError(apiErr(e));}};
+  const exportCsv=async()=>{setError('');try{const {data}=await exportQuery.refetch();if(data){const blob=new Blob([data],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${brandFileStem}-results.csv`;a.click();URL.revokeObjectURL(url);}}catch(e){setError(apiErr(e));}};
   const status=overview.data?.eventStatus||'NOT_STARTED';
   return <AdminShell title="Settings"><PageTitle eyebrow="EVENT STEWARDSHIP" title="Settings & controls" detail="Open the crossing, tune the arrival threshold and take a record of the voyage."/>
     {(settings.isLoading||overview.isLoading)&&<Loading text="Reading the event instruments…"/>}

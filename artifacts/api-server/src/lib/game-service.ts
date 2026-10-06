@@ -60,6 +60,11 @@ export async function loadAdminTeam(teamId: string) {
     id: team.id,
     name: team.name,
     members: team.members,
+    codeHint: team.codeHint,
+    leaderName: team.leaderName,
+    claimedAt: team.claimedAt,
+    lastLoginAt: team.lastLoginAt,
+    userAgent: team.userAgent,
     status: team.status,
     startedAt: team.startedAt,
     finishedAt: team.finishedAt,
@@ -340,7 +345,7 @@ export async function getTeamGameState(teamId: string) {
 }
 
 export async function createProvisioningPasscode() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
   let code = "";
   for (let index = 0; index < 8; index += 1) {
     code += alphabet[randomInt(alphabet.length)];

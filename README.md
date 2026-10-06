@@ -1,6 +1,6 @@
-# ODECEEE · The Odyssey
+# WATT A PLAY 3.0 · THE ODECEEE
 
-A mobile-first, no-map GPS scavenger hunt for NITK Surathkal, with a live IET NITK volunteer console.
+A mobile-first, no-map GPS treasure hunt presented by IET NITK, with a live volunteer console.
 
 ## Run locally in this Repl
 
@@ -29,13 +29,25 @@ pnpm --filter @workspace/api-spec run codegen
 
 1. In **Admin → Checkpoints**, replace every seed entry prefixed `REPLACE WITH REAL LOCATIONS` with verified campus coordinates, names, hints, and radii. The seed coordinates are placeholders and must not be used for a real event.
 2. Add enough active checkpoints for the planned routes. Checkpoint deactivation is a soft delete; teams skip inactive stops.
-3. In **Admin → Teams**, create or bulk-create crews. Record each generated passcode immediately and distribute it privately; the app shows a new passcode only once.
-4. Review **Admin → Settings**. Defaults are a 30 m checkpoint radius, 40 m accuracy slack, and 200 m maximum accepted GPS accuracy. The overview counts an active crew as stalled after 90 seconds without a location update.
-5. Test on the actual phones and browsers participants will use. The player flow needs a secure HTTPS page, precise location permission, and (when supported) motion/orientation permission. Confirm audible output and screen wake behavior.
-6. Start the event from **Admin → Settings** only when volunteers are ready. Pause or end it there; export results as CSV after the event.
-7. Upload the approved IET NITK logo in the on-page slot for a preview, or place the persistent asset at `artifacts/odyssey-hunt/public/branding/iet-nitk-logo.svg`.
+3. In **Admin → Teams**, create or bulk-create crews. Download or print the generated codes immediately and give one privately to each captain; codes are shown only when issued.
+4. Each captain enters only the team code. The first captain claims it with their name on one phone; later logins must use that same phone. In the admin console, **Release phone** unlocks a lost-device team without changing progress. **New code · keep progress** also preserves progress; **Reset progress** is the destructive route reset.
+5. Review **Admin → Settings**. Defaults are a 30 m checkpoint radius, 40 m accuracy slack, and 200 m maximum accepted GPS accuracy. The overview counts an active crew as stalled after 90 seconds without a location update.
+6. Test on the actual phones and browsers participants will use. The player flow needs a secure HTTPS page, precise location permission, and (when supported) motion/orientation permission. Confirm audible output and screen wake behavior.
+7. Start the event from **Admin → Settings** only when volunteers are ready. Pause or end it there; export results as CSV after the event.
+8. The IET NITK logo supplied for this event is fixed at `artifacts/odyssey-hunt/public/branding/iet-nitk-logo.png`. Keep the supplied artwork intact.
 
 The player route never displays a map or future checkpoint coordinates. The volunteer-only **God’s Eye** view can show the live campus map and team positions.
+
+## Event-day checklist
+
+- [ ] Verify the event date, operator/admin login, real checkpoint coordinates, hints, route order, and capture radii.
+- [ ] Test the website on the actual event phones over mobile data and campus Wi-Fi; grant precise location and motion permissions.
+- [ ] Check that the Siren is audible, the 39-second compass updates, the display stays awake, and checkpoint capture succeeds inside the real radius.
+- [ ] Confirm that the login screen rejects an unknown code, asks for the captain’s name only on first use, and resumes the same team on its claimed phone.
+- [ ] Keep the admin console open on a volunteer device. Use **Release phone** for a lost/replaced handset; use **New code · keep progress** only if a code must change.
+- [ ] Print or download slips securely, hand each code to one captain, and do not display/export codes on a public screen.
+- [ ] Start the event only after the volunteer team is ready. Keep an operator available to pause, end, or help a captain regain access.
+- [ ] At close, end the event, export the results CSV, and securely dispose of any temporary code slips or CSV files.
 
 ## Environment and data
 
@@ -64,7 +76,7 @@ The API’s production build generates Prisma Client and bundles the service; it
 - `/admin/login` — volunteer sign-in
 - `/admin` — live overview and volunteer-only map
 - `/admin/checkpoints` — checkpoint and route management
-- `/admin/teams` — team passes, resets, and roster
+- `/admin/teams` — one-time code slips, captain/device status, phone release, progress-preserving code regeneration, and route reset
 - `/admin/settings` — event controls, capture thresholds, and CSV export
 
 In development only, `/voyage?debug=1` enables the local GPS simulator.
