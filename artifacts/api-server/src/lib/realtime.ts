@@ -24,6 +24,10 @@ export function disconnectTeamSessions(teamId: string) {
   io?.in(`team:${teamId}`).disconnectSockets(true);
 }
 
+export function disconnectAdminAccountSessions(adminId: string) {
+  io?.in(`admin:${adminId}`).disconnectSockets(true);
+}
+
 export async function publishTeamUpdate(teamId: string) {
   const team = await loadAdminTeam(teamId);
   if (team) emitToAdmins("admin:team:update", team);

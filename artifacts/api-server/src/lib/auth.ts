@@ -4,7 +4,7 @@ import { env } from "./env";
 import { SESSION_COOKIE, SESSION_MAX_AGE_MS } from "./constants";
 import { prisma } from "./prisma";
 
-export type UserRole = "TEAM" | "ADMIN";
+export type UserRole = "TEAM" | "ADMIN" | "VOLUNTEER";
 
 export interface SessionUser {
   id: string;
@@ -34,7 +34,7 @@ export function signSession(user: SessionUser): string {
             sessionVersion: user.sessionVersion ?? 0,
             deviceId: user.deviceId,
           }
-        : {}),
+        : { sessionVersion: user.sessionVersion ?? 0 }),
     },
     env.jwtSecret,
     { subject: user.id, expiresIn: "24h", issuer: "watt-a-play-3-odeceee" },
@@ -68,7 +68,9 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
     }) as JwtPayload;
     if (
       typeof payload.sub !== "string" ||
-      (payload.role !== "TEAM" && payload.role !== "ADMIN")
+      (payload.role !== "TEAM" &&
+        payload.role !== "ADMIN" &&
+        payload.role !== "VOLUNTEER")
     ) {
       return null;
     }
@@ -77,6 +79,14 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
       (!Number.isInteger(payload.sessionVersion) ||
         typeof payload.sessionVersion !== "number" ||
         typeof payload.deviceId !== "string")
+    ) {
+      return null;
+    }
+    if (
+      payload.role !== "TEAM" &&
+      payload.sessionVersion !== undefined &&
+      (typeof payload.sessionVersion !== "number" ||
+        !Number.isInteger(payload.sessionVersion))
     ) {
       return null;
     }
@@ -90,7 +100,7 @@ export function readSessionToken(token: string | undefined): SessionUser | null 
             sessionVersion: payload.sessionVersion as number,
             deviceId: payload.deviceId as string,
           }
-        : {}),
+        : { sessionVersion: (payload.sessionVersion as number | undefined) ?? 0 }),
     };
   } catch {
     return null;
@@ -115,6 +125,20 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
     ) {
       clearSessionCookie(res);
       res.status(401).json({ error: "This captain session is no longer active. Sign in again." });
+      return;
+    }
+  } else {
+    const account = await prisma.admin.findUnique({
+      where: { id: user.id },
+      select: { role: true, sessionVersion: true },
+    });
+    if (
+      !account ||
+      account.role !== user.role ||
+      account.sessionVersion !== (user.sessionVersion ?? 0)
+    ) {
+      clearSessionCookie(res);
+      res.status(401).json({ error: "This volunteer session is no longer active. Sign in again." });
       return;
     }
   }

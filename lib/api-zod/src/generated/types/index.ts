@@ -34,3 +34,6 @@ export * from './teamInput';
 export * from './teamLoginInput';
 export * from './teamStatus';
 export * from './teamUpdateInput';
+export * from './volunteerAccount';
+export * from './volunteerAccountInput';
+export * from './volunteerPasswordInput';

@@ -402,8 +402,27 @@ export function attachGameSockets(server: HttpServer) {
         });
       return;
     }
-    (socket as ClientSocket).data.odysseyUser = user;
-    next();
+    void prisma.admin
+      .findUnique({
+        where: { id: user.id },
+        select: { role: true, sessionVersion: true },
+      })
+      .then((account) => {
+        if (
+          !account ||
+          account.role !== user.role ||
+          account.sessionVersion !== (user.sessionVersion ?? 0)
+        ) {
+          next(new Error("Volunteer session is no longer active"));
+          return;
+        }
+        (socket as ClientSocket).data.odysseyUser = user;
+        next();
+      })
+      .catch((error) => {
+        logger.error({ err: error }, "Unable to validate Socket.IO volunteer session");
+        next(new Error("Authentication service unavailable"));
+      });
   });
 
   io.on("connection", (rawSocket) => {
@@ -413,8 +432,9 @@ export function attachGameSockets(server: HttpServer) {
       socket.disconnect(true);
       return;
     }
-    if (user.role === "ADMIN") {
+    if (user.role === "ADMIN" || user.role === "VOLUNTEER") {
       socket.join("admins");
+      socket.join(`admin:${user.id}`);
       void sendAdminSnapshot(socket).catch((error) =>
         logger.error({ err: error }, "Unable to send initial admin snapshot"),
       );

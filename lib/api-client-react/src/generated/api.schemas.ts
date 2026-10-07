@@ -19,6 +19,7 @@ export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
 export const AuthUserRole = {
   TEAM: 'TEAM',
   ADMIN: 'ADMIN',
+  VOLUNTEER: 'VOLUNTEER',
 } as const;
 
 export interface AuthUser {
@@ -53,6 +54,33 @@ export interface AdminLoginInput {
   /** @minLength 1 */
   username: string;
   /** @minLength 1 */
+  password: string;
+}
+
+export interface VolunteerAccount {
+  id: string;
+  username: string;
+}
+
+export interface VolunteerAccountInput {
+  /**
+     * @minLength 3
+     * @maxLength 32
+     * @pattern ^[A-Za-z0-9._-]+$
+     */
+  username: string;
+  /**
+     * @minLength 12
+     * @maxLength 72
+     */
+  password: string;
+}
+
+export interface VolunteerPasswordInput {
+  /**
+     * @minLength 12
+     * @maxLength 72
+     */
   password: string;
 }
 

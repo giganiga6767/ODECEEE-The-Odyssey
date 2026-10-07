@@ -36,7 +36,10 @@ import type {
   ProvisionedTeam,
   TeamInput,
   TeamLoginInput,
-  TeamUpdateInput
+  TeamUpdateInput,
+  VolunteerAccount,
+  VolunteerAccountInput,
+  VolunteerPasswordInput
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -2050,6 +2053,334 @@ export const useEndEvent = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getEndEventMutationOptions(options));
+    }
+
+export const getGetVolunteerAccountsUrl = () => {
+
+
+
+
+  return `/api/admin/volunteers`
+}
+
+/**
+ * @summary List volunteer accounts
+ */
+export const getVolunteerAccounts = async ( options?: Parameters<typeof customFetch>[1]): Promise<VolunteerAccount[]> => {
+
+  return customFetch<VolunteerAccount[]>(getGetVolunteerAccountsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetVolunteerAccountsQueryKey = () => {
+    return [
+    `/api/admin/volunteers`
+    ] as const;
+    }
+
+
+export const getGetVolunteerAccountsQueryOptions = <TData = Awaited<ReturnType<typeof getVolunteerAccounts>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolunteerAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetVolunteerAccountsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getVolunteerAccounts>>> = ({ signal }) => getVolunteerAccounts({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getVolunteerAccounts>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetVolunteerAccountsQueryResult = NonNullable<Awaited<ReturnType<typeof getVolunteerAccounts>>>
+export type GetVolunteerAccountsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List volunteer accounts
+ */
+
+export function useGetVolunteerAccounts<TData = Awaited<ReturnType<typeof getVolunteerAccounts>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getVolunteerAccounts>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetVolunteerAccountsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateVolunteerUrl = () => {
+
+
+
+
+  return `/api/admin/volunteers`
+}
+
+/**
+ * @summary Create a volunteer account
+ */
+export const createVolunteer = async (volunteerAccountInput: VolunteerAccountInput, options?: Parameters<typeof customFetch>[1]): Promise<VolunteerAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VolunteerAccount>(getCreateVolunteerUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(volunteerAccountInput)
+  }
+);}
+
+
+
+
+
+export const getCreateVolunteerMutationKey = () => ['createVolunteer'] as const;
+
+export const getCreateVolunteerMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolunteer>>, TError,CreateVolunteerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createVolunteer>>, TError,CreateVolunteerMutationVariables, TContext> => {
+
+const mutationKey = getCreateVolunteerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createVolunteer>>, CreateVolunteerMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createVolunteer(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateVolunteerMutationResult = NonNullable<Awaited<ReturnType<typeof createVolunteer>>>
+    export type CreateVolunteerMutationBody = BodyType<VolunteerAccountInput>
+    export type CreateVolunteerMutationError = ErrorType<unknown>
+    export type CreateVolunteerMutationVariables = {data: BodyType<VolunteerAccountInput>}
+
+    /**
+ * @summary Create a volunteer account
+ */
+export const useCreateVolunteer = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createVolunteer>>, TError,CreateVolunteerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createVolunteer>>,
+        TError,
+        CreateVolunteerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateVolunteerMutationOptions(options));
+    }
+
+export const getResetVolunteerPasswordUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/volunteers/${id}/password`
+}
+
+/**
+ * @summary Reset a volunteer account password
+ */
+export const resetVolunteerPassword = async (id: string,
+    volunteerPasswordInput: VolunteerPasswordInput, options?: Parameters<typeof customFetch>[1]): Promise<VolunteerAccount> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<VolunteerAccount>(getResetVolunteerPasswordUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(volunteerPasswordInput)
+  }
+);}
+
+
+
+
+
+export const getResetVolunteerPasswordMutationKey = () => ['resetVolunteerPassword'] as const;
+
+export const getResetVolunteerPasswordMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetVolunteerPassword>>, TError,ResetVolunteerPasswordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetVolunteerPassword>>, TError,ResetVolunteerPasswordMutationVariables, TContext> => {
+
+const mutationKey = getResetVolunteerPasswordMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetVolunteerPassword>>, ResetVolunteerPasswordMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  resetVolunteerPassword(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetVolunteerPasswordMutationResult = NonNullable<Awaited<ReturnType<typeof resetVolunteerPassword>>>
+    export type ResetVolunteerPasswordMutationBody = BodyType<VolunteerPasswordInput>
+    export type ResetVolunteerPasswordMutationError = ErrorType<unknown>
+    export type ResetVolunteerPasswordMutationVariables = {id: string;data: BodyType<VolunteerPasswordInput>}
+
+    /**
+ * @summary Reset a volunteer account password
+ */
+export const useResetVolunteerPassword = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetVolunteerPassword>>, TError,ResetVolunteerPasswordMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetVolunteerPassword>>,
+        TError,
+        ResetVolunteerPasswordMutationVariables,
+        TContext
+      > => {
+      return useMutation(getResetVolunteerPasswordMutationOptions(options));
+    }
+
+export const getDeleteVolunteerAccountUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/volunteers/${id}`
+}
+
+/**
+ * @summary Delete a volunteer account
+ */
+export const deleteVolunteerAccount = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<OkResponse> => {
+
+  return customFetch<OkResponse>(getDeleteVolunteerAccountUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getDeleteVolunteerAccountMutationKey = () => ['deleteVolunteerAccount'] as const;
+
+export const getDeleteVolunteerAccountMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolunteerAccount>>, TError,DeleteVolunteerAccountMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteVolunteerAccount>>, TError,DeleteVolunteerAccountMutationVariables, TContext> => {
+
+const mutationKey = getDeleteVolunteerAccountMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteVolunteerAccount>>, DeleteVolunteerAccountMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  deleteVolunteerAccount(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteVolunteerAccountMutationResult = NonNullable<Awaited<ReturnType<typeof deleteVolunteerAccount>>>
+
+    export type DeleteVolunteerAccountMutationError = ErrorType<unknown>
+    export type DeleteVolunteerAccountMutationVariables = {id: string}
+
+    /**
+ * @summary Delete a volunteer account
+ */
+export const useDeleteVolunteerAccount = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteVolunteerAccount>>, TError,DeleteVolunteerAccountMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteVolunteerAccount>>,
+        TError,
+        DeleteVolunteerAccountMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDeleteVolunteerAccountMutationOptions(options));
     }
 
 export const getExportResultsUrl = () => {

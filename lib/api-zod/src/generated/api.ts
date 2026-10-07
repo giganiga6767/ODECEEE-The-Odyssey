@@ -39,7 +39,7 @@ export const TeamLoginBody = zod.object({
 export const TeamLoginResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "role": zod.enum(['TEAM', 'ADMIN']),
+  "role": zod.enum(['TEAM', 'ADMIN', 'VOLUNTEER']),
   "name": zod.string().nullable(),
   "teamId": zod.string().nullable()
 })
@@ -61,7 +61,7 @@ export const AdminLoginBody = zod.object({
 export const AdminLoginResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "role": zod.enum(['TEAM', 'ADMIN']),
+  "role": zod.enum(['TEAM', 'ADMIN', 'VOLUNTEER']),
   "name": zod.string().nullable(),
   "teamId": zod.string().nullable()
 })
@@ -82,7 +82,7 @@ export const LogoutResponse = zod.object({
 export const GetCurrentUserResponse = zod.object({
   "user": zod.object({
   "id": zod.string(),
-  "role": zod.enum(['TEAM', 'ADMIN']),
+  "role": zod.enum(['TEAM', 'ADMIN', 'VOLUNTEER']),
   "name": zod.string().nullable(),
   "teamId": zod.string().nullable()
 })
@@ -727,6 +727,74 @@ export const PauseEventResponse = zod.object({
  */
 export const EndEventResponse = zod.object({
   "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'PAUSED', 'ENDED'])
+})
+
+
+/**
+ * @summary List volunteer accounts
+ */
+export const GetVolunteerAccountsResponseItem = zod.object({
+  "id": zod.string(),
+  "username": zod.string()
+})
+export const GetVolunteerAccountsResponse = zod.array(GetVolunteerAccountsResponseItem)
+
+
+/**
+ * @summary Create a volunteer account
+ */
+export const createVolunteerBodyUsernameMin = 3;
+export const createVolunteerBodyUsernameMax = 32;
+
+
+export const createVolunteerBodyUsernameRegExp = new RegExp('^[A-Za-z0-9._-]+$');
+export const createVolunteerBodyPasswordMin = 12;
+export const createVolunteerBodyPasswordMax = 72;
+
+
+
+export const CreateVolunteerBody = zod.object({
+  "username": zod.string().min(createVolunteerBodyUsernameMin).max(createVolunteerBodyUsernameMax).regex(createVolunteerBodyUsernameRegExp),
+  "password": zod.string().min(createVolunteerBodyPasswordMin).max(createVolunteerBodyPasswordMax)
+})
+
+export const CreateVolunteerResponse = zod.object({
+  "id": zod.string(),
+  "username": zod.string()
+})
+
+
+/**
+ * @summary Reset a volunteer account password
+ */
+export const ResetVolunteerPasswordParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const resetVolunteerPasswordBodyPasswordMin = 12;
+export const resetVolunteerPasswordBodyPasswordMax = 72;
+
+
+
+export const ResetVolunteerPasswordBody = zod.object({
+  "password": zod.string().min(resetVolunteerPasswordBodyPasswordMin).max(resetVolunteerPasswordBodyPasswordMax)
+})
+
+export const ResetVolunteerPasswordResponse = zod.object({
+  "id": zod.string(),
+  "username": zod.string()
+})
+
+
+/**
+ * @summary Delete a volunteer account
+ */
+export const DeleteVolunteerAccountParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DeleteVolunteerAccountResponse = zod.object({
+  "ok": zod.boolean()
 })
 
 

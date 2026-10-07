@@ -189,11 +189,12 @@ async function createTeamRoute(
     where: { teamId: { not: teamId } },
     orderBy: { orderIndex: "asc" },
   });
-  const usedFirstIds = new Set(
-    otherRoutes
-      .filter((route) => route.orderIndex === 0)
-      .map((route) => route.checkpointId),
-  );
+  const firstCounts = new Map(checkpoints.map((checkpoint) => [checkpoint.id, 0]));
+  for (const route of otherRoutes) {
+    if (route.orderIndex === 0 && firstCounts.has(route.checkpointId)) {
+      firstCounts.set(route.checkpointId, (firstCounts.get(route.checkpointId) ?? 0) + 1);
+    }
+  }
   const routeGroups = new Map<string, string[]>();
   for (const route of otherRoutes) {
     const group = routeGroups.get(route.teamId) ?? [];
@@ -204,17 +205,20 @@ async function createTeamRoute(
     route.join("|"),
   );
 
-  let order = shuffled(checkpoints);
+  const leastUsedCount = Math.min(...firstCounts.values());
+  const firstOptions = checkpoints.filter(
+    (checkpoint) => firstCounts.get(checkpoint.id) === leastUsedCount,
+  );
+  const first = firstOptions[randomInt(firstOptions.length)];
+  const remaining = checkpoints.filter((checkpoint) => checkpoint.id !== first.id);
+  let order = [first, ...shuffled(remaining)];
   for (let attempt = 0; attempt < 500; attempt += 1) {
-    const candidate = shuffled(checkpoints);
-    const uniqueFirst =
-      usedFirstIds.size >= checkpoints.length ||
-      !usedFirstIds.has(candidate[0]?.id ?? "");
+    const candidate = [first, ...shuffled(remaining)];
     const uniqueOrder = !otherOrders.includes(
       candidate.map((checkpoint) => checkpoint.id).join("|"),
     );
     order = candidate;
-    if (uniqueFirst && uniqueOrder) break;
+    if (uniqueOrder) break;
   }
 
   await transaction.teamRoute.createMany({
@@ -223,6 +227,27 @@ async function createTeamRoute(
       checkpointId: checkpoint.id,
       orderIndex,
     })),
+  });
+}
+
+export async function assignRoutesForRegisteredTeams() {
+  await prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
+    const teams = await transaction.team.findMany({
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (teams.length) {
+      const activeCheckpointCount = await transaction.checkpoint.count({
+        where: { isActive: true },
+      });
+      if (!activeCheckpointCount) {
+        throw new Error("Add at least one active checkpoint before starting the event.");
+      }
+    }
+    for (const team of shuffled(teams)) {
+      await createTeamRoute(transaction, team.id);
+    }
   });
 }
 

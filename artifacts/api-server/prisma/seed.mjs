@@ -18,8 +18,8 @@ try {
   const passwordHash = await bcrypt.hash(process.env.ADMIN_PASSWORD, 12);
   await prisma.admin.upsert({
     where: { username: process.env.ADMIN_USERNAME },
-    create: { username: process.env.ADMIN_USERNAME, passwordHash },
-    update: { passwordHash },
+    create: { username: process.env.ADMIN_USERNAME, passwordHash, role: "ADMIN" },
+    update: { passwordHash, role: "ADMIN" },
   });
   await prisma.gameSettings.upsert({
     where: { id: "global" },

@@ -12,4 +12,5 @@ export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
 export const AuthUserRole = {
   TEAM: 'TEAM',
   ADMIN: 'ADMIN',
+  VOLUNTEER: 'VOLUNTEER',
 } as const;

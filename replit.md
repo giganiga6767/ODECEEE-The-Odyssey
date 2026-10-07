@@ -32,7 +32,9 @@ Mobile-first NITK GPS treasure hunt presented by IET NITK, with a separate volun
 - Teams see only their current checkpoint. The volunteer-only admin view contains team positions and assigned routes.
 - The oracle direction and distance band refresh on a 39-second cycle; GPS fixes update refs and server telemetry between cycles.
 - The server validates capture distance and accuracy from consecutive location updates; clients cannot submit a capture directly.
-- Event status, passcodes, teams, checkpoints, settings, and result export are managed in the admin console.
+- Event status, passcodes, teams, checkpoints, settings, and result export are managed in the admin and volunteer console.
+- Volunteers use separate accounts with full event-operation permissions. Only admins can create, reset, or delete volunteer accounts.
+- Event start assigns random checkpoint orders to all registered teams and balances first stops across the active checkpoints.
 
 ## Operational constraints
 

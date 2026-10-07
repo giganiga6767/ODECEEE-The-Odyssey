@@ -16,7 +16,6 @@ import {
   setSessionCookie,
   signSession,
 } from "../lib/auth";
-import { env } from "../lib/env";
 import { prisma } from "../lib/prisma";
 import { logger } from "../lib/logger";
 
@@ -164,19 +163,26 @@ router.post("/auth/admin/login", loginLimit, async (req, res): Promise<void> => 
     return;
   }
 
-  const admin = await prisma.admin.findUnique({
-    where: { username: parsed.data.username },
+  const admin = await prisma.admin.findFirst({
+    where: {
+      username: { equals: parsed.data.username.trim(), mode: "insensitive" },
+    },
   });
   const valid =
-    parsed.data.username === env.adminUsername &&
     admin !== null &&
     (await bcrypt.compare(parsed.data.password, admin.passwordHash));
   if (!valid) {
-    res.status(401).json({ error: "The Fates Have Spoken: those admin credentials were not recognized." });
+    res.status(401).json({ error: "Those console credentials were not recognized." });
     return;
   }
 
-  const user = { id: admin.id, role: "ADMIN" as const, name: admin.username, teamId: null };
+  const user = {
+    id: admin.id,
+    role: admin.role,
+    name: admin.username,
+    teamId: null,
+    sessionVersion: admin.sessionVersion,
+  };
   setSessionCookie(res, signSession(user));
   res.json(AdminLoginResponse.parse({ user }));
 });

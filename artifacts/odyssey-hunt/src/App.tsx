@@ -24,6 +24,7 @@ import type { ButtonHTMLAttributes, FormEvent, ReactNode } from 'react';
 import { useOdysseySocket } from '@/hooks/use-odyssey-socket';
 import { createSirenAudio, type SirenAudioEngine } from '@/lib/siren-audio';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { VolunteerAccountsPanel } from '@/components/admin/VolunteerAccountsPanel';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import NotFound from '@/pages/not-found';
@@ -88,7 +89,7 @@ function PageTitle({ eyebrow, title, detail }: { eyebrow: string; title: string;
   return <div className="mb-7"><p className="label text-[#d4af37]">{eyebrow}</p><h1 className="mt-2 font-cinzel text-2xl tracking-wide text-[#ede6d6] sm:text-3xl">{title}</h1>{detail && <p className="mt-2 max-w-2xl font-cormorant text-xl text-[#b9c4d5]">{detail}</p>}</div>;
 }
 function GoldButton({ children, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
-  return <button {...props} className={`gold-button flex w-full items-center justify-center gap-2 rounded-sm px-5 ${props.className || ''}`} />;
+  return <button {...props} className={`gold-button flex w-full items-center justify-center gap-2 rounded-sm px-5 ${props.className || ''}`} style={{color:'#f1e4c4'}}>{children}</button>;
 }
 function TallShip() {
   return <svg className="tall-ship" viewBox="0 0 560 230" role="img" aria-label="Engraved tall ship illustration">
@@ -139,6 +140,7 @@ function Routed() {
     <Route path="/admin/login" component={AdminLogin}/>
     <Route path="/admin" component={AdminOverviewPage}/><Route path="/admin/checkpoints" component={CheckpointsPage}/>
     <Route path="/admin/teams" component={TeamsPage}/><Route path="/admin/settings" component={SettingsPage}/>
+    <Route path="/admin/volunteers" component={VolunteerAccountsPage}/>
     <Route component={NotFound}/>
   </Switch></ErrorBoundary>;
 }
@@ -154,7 +156,11 @@ function TeamEntry() {
   const [error, setError] = useState('');
   const submittedCode = useRef('');
   const eventState = useGetGameState({ query: { queryKey: getGetGameStateQueryKey(), enabled: !!current.data?.user && current.data.user.role === 'TEAM', retry: false, refetchInterval: 12000 } });
-  useEffect(() => { if (current.data?.user?.role === 'TEAM') setLocation('/voyage'); }, [current.data, setLocation]);
+   useEffect(() => {
+     const role = current.data?.user?.role;
+     if (role === 'TEAM') setLocation('/voyage');
+     else if (role === 'ADMIN' || role === 'VOLUNTEER') setLocation('/admin');
+   }, [current.data, setLocation]);
   const submit = async (e?: FormEvent, rawCode = accessCode) => {
     e?.preventDefault();
     const code = normalizeTeamCode(rawCode);
@@ -444,9 +450,12 @@ function Voyage() {
 }
 
 const adminNav=[{href:'/admin',label:'God’s Eye',icon:Eye},{href:'/admin/checkpoints',label:'Checkpoints',icon:MapPin},{href:'/admin/teams',label:'Teams',icon:Users},{href:'/admin/settings',label:'Settings',icon:Settings}];
+const volunteerAccountsNav={href:'/admin/volunteers',label:'Volunteers',icon:Shield};
 function AdminShell({children,title}:{children:ReactNode;title:string}) {
   const [,setLocation]=useLocation();const qc=useQueryClient();const user=useGetCurrentUser({query:{queryKey:getGetCurrentUserQueryKey(),retry:false}});const logout=useLogout();const [mobile,setMobile]=useState(false);const [captureNotice,setCaptureNotice]=useState('');
-  const adminSocket=useOdysseySocket(user.data?.user?.role==='ADMIN',{
+  const navigation=user.data?.user?.role==='ADMIN'?[...adminNav,volunteerAccountsNav]:adminNav;
+  const canOpenAdmin=user.data?.user?.role==='ADMIN'||user.data?.user?.role==='VOLUNTEER';
+  const adminSocket=useOdysseySocket(canOpenAdmin,{
     'admin:snapshot':(payload)=>{
       const value=payload as {teams?:unknown;overview?:unknown;teamCount?:unknown};
       const snapshotTeams=Array.isArray(payload)?payload:Array.isArray(value?.teams)?value.teams:null;
@@ -462,11 +471,11 @@ function AdminShell({children,title}:{children:ReactNode;title:string}) {
   useEffect(()=>{if(user.isError)setLocation('/admin/login');else if(user.data?.user?.role==='TEAM')setLocation('/');},[user.isError,user.data,setLocation]);
   const signout=()=>logout.mutate(undefined,{onSuccess:()=>{void qc.invalidateQueries({queryKey:getGetCurrentUserQueryKey()});setLocation('/admin/login');}});
   return <div className="admin-shell relative min-h-[100dvh] md:flex">
-    <aside className="hidden w-[248px] shrink-0 border-r border-[#d4af3725] bg-[#071229] p-5 md:flex md:flex-col"><div className="mb-8"><Brand darkSurface/><div className="mt-5" data-testid="logo-upload-slot"><LogoUploadSlot surface="tag" slot="admin-sidebar"/></div></div><p className="label mb-3 pl-3">VOLUNTEER CONSOLE</p><nav className="space-y-1">{adminNav.map(n=><Link href={n.href} key={n.href} className={`nav-item ${title===n.label?'active':''}`} data-testid={`link-admin-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={17}/>{n.label}</Link>)}</nav><div className="mt-auto border-t border-[#d4af3725] pt-4"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#d4af3750] font-cinzel text-[#f2d98a]">{user.data?.user?.name?.slice(0,1)||'I'}</div><div><div className="text-sm">{user.data?.user?.name||'IET Volunteer'}</div><div className="label">EVENT CREW</div></div></div><button onClick={signout} className="min-h-11 w-full text-left text-sm text-[#b9c4d5]" data-testid="button-admin-signout">Sign out</button></div></aside>
+     <aside className="hidden w-[248px] shrink-0 border-r border-[#d4af3725] bg-[#071229] p-5 md:flex md:flex-col"><div className="mb-8"><Brand darkSurface/><div className="mt-5" data-testid="logo-upload-slot"><LogoUploadSlot surface="tag" slot="admin-sidebar"/></div></div><p className="label mb-3 pl-3">VOLUNTEER CONSOLE</p><nav className="space-y-1">{navigation.map(n=><Link href={n.href} key={n.href} className={`nav-item ${title===n.label?'active':''}`} data-testid={`link-admin-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={17}/>{n.label}</Link>)}</nav><div className="mt-auto border-t border-[#d4af3725] pt-4"><div className="mb-4 flex items-center gap-3"><div className="grid h-9 w-9 place-items-center border border-[#d4af3750] font-cinzel text-[#f2d98a]">{user.data?.user?.name?.slice(0,1)||'I'}</div><div><div className="text-sm">{user.data?.user?.name||'IET Volunteer'}</div><div className="label">{user.data?.user?.role==='ADMIN'?'ADMINISTRATOR':'VOLUNTEER'}</div></div></div><button onClick={signout} className="min-h-11 w-full text-left text-sm text-[#b9c4d5]" data-testid="button-admin-signout">Sign out</button></div></aside>
     <div className="min-w-0 flex-1">
         <header className="sticky top-0 z-30 flex min-h-16 items-center justify-between border-b border-[#d4af3725] bg-[#050b1fee] px-4 backdrop-blur md:px-8"><div className="flex items-center gap-3"><button className="grid h-11 w-11 place-items-center text-[#f2d98a] md:hidden" onClick={()=>setMobile(!mobile)} aria-label="Open navigation" data-testid="button-mobile-menu">{mobile?<X/>:<Menu/>}</button><div className="md:hidden"><Brand compact/></div><span className="hidden font-cinzel text-sm tracking-widest md:block">{BRAND.event} <span className="text-[#8191a8]">/</span> {title.toUpperCase()}</span></div><div className="flex items-center gap-3"><span className={`hidden items-center gap-2 text-xs sm:flex ${adminSocket.connection==='connected'?'text-[#a7d7bd]':'text-[#d4af37]'}`} data-testid="status-admin-socket"><span className={`h-2 w-2 rounded-full ${adminSocket.connection==='connected'?'bg-[#73c999]':'bg-[#d4af37]'}`}/>{adminSocket.connection==='connected'?'LIVE CONSOLE':'RECONNECTING'}</span><LogoUploadSlot small slot="admin-header"/><button onClick={signout} className="hidden min-h-10 text-xs text-[#b9c4d5] md:block" data-testid="button-signout-top">Sign out</button></div></header>
       {captureNotice&&<div className="fixed right-4 top-[76px] z-40 max-w-[calc(100vw-2rem)] border border-[#73c99970] bg-[#0a1f35] px-4 py-3 text-sm text-[#c3ead1] shadow-xl" role="status" aria-live="polite" data-testid="toast-checkpoint-captured"><span className="mr-2 text-[#f2d98a]">OFFERING ACCEPTED</span>{captureNotice}</div>}
-      {mobile&&<nav className="relative z-20 grid grid-cols-2 gap-2 border-b border-[#d4af3725] bg-[#08152c] p-3 md:hidden">{adminNav.map(n=><Link key={n.href} href={n.href} className={`nav-item ${title===n.label?'active':''}`} onClick={()=>setMobile(false)} data-testid={`link-mobile-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={16}/>{n.label}</Link>)}<button onClick={signout} className="nav-item" data-testid="button-mobile-signout">Sign out</button></nav>}
+       {mobile&&<nav className="relative z-20 grid grid-cols-2 gap-2 border-b border-[#d4af3725] bg-[#08152c] p-3 md:hidden">{navigation.map(n=><Link key={n.href} href={n.href} className={`nav-item ${title===n.label?'active':''}`} onClick={()=>setMobile(false)} data-testid={`link-mobile-${n.label.toLowerCase().replaceAll(' ','-')}`}><n.icon size={16}/>{n.label}</Link>)}<button onClick={signout} className="nav-item" data-testid="button-mobile-signout">Sign out</button></nav>}
       <main className="mx-auto max-w-[1500px] p-4 pb-12 sm:p-6 md:p-8">{children}</main>
     </div>
   </div>;
@@ -474,7 +483,7 @@ function AdminShell({children,title}:{children:ReactNode;title:string}) {
 function AdminLogin() {
   const [,setLocation]=useLocation();const qc=useQueryClient();const current=useGetCurrentUser({query:{queryKey:getGetCurrentUserQueryKey(),retry:false}});const login=useAdminLogin();
   const [username,setUsername]=useState('');const [password,setPassword]=useState('');const [error,setError]=useState('');
-  useEffect(()=>{if(current.data?.user?.role==='ADMIN')setLocation('/admin');},[current.data,setLocation]);
+  useEffect(()=>{const role=current.data?.user?.role;if(role==='ADMIN'||role==='VOLUNTEER')setLocation('/admin');},[current.data,setLocation]);
   const submit=async(e:React.FormEvent)=>{e.preventDefault();setError('');try{await login.mutateAsync({data:{username:username.trim(),password}});await qc.invalidateQueries({queryKey:getGetCurrentUserQueryKey()});setLocation('/admin');}catch(e){setError(apiErr(e));}};
   return <main className="relative grid min-h-[100dvh] place-items-center overflow-hidden px-5 py-8"><div className="absolute left-0 right-0 top-0"><Header label="VOLUNTEER ACCESS"/></div><div className="panel relative z-10 w-full max-w-md p-6 sm:p-9"><div className="mb-7 flex items-center justify-between"><div><p className="label text-[#d4af37]">IET NITK VOLUNTEERS</p><h1 className="mt-2 font-cinzel text-2xl">God’s Eye access</h1></div><Shield className="text-[#f2d98a]" size={25}/></div><p className="mb-6 font-cormorant text-xl text-[#b9c4d5]">Steady hands guide the voyage. Sign in to open the live console.</p>{error&&<div className="mb-4"><ErrorNotice error={error}/></div>}<form onSubmit={submit} className="space-y-4"><label className="block"><span className="label mb-2 block">Volunteer username</span><input className="field" required autoComplete="username" value={username} onChange={e=>setUsername(e.target.value)} data-testid="input-admin-username"/></label><label className="block"><span className="label mb-2 block">Password</span><input className="field" required type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} data-testid="input-admin-password"/></label><GoldButton type="submit" disabled={login.isPending} data-testid="button-admin-login">{login.isPending?'Opening console…':'Enter the console'}<ArrowRight size={16}/></GoldButton></form><Link href="/" className="mt-6 inline-flex min-h-12 items-center gap-2 text-sm text-[#b9c4d5]" data-testid="link-team-pass"><ArrowLeft size={15}/> Team pass</Link></div><p className="absolute bottom-5 font-cormorant text-lg italic text-[#8191a8]">Presented by IET NITK</p></main>;
 }
@@ -496,6 +505,16 @@ function AdminMap({teams}:{teams:AdminTeam[]}) {
     </div><div className="border-t border-[#d4af3725] px-4 py-2 text-[10px] text-[#91a0b7]">Map is visible to volunteers only. Team devices never receive route destinations beyond their current checkpoint.</div>
   </section>;
 }
+function VolunteerAccountsPage() {
+  const [,setLocation]=useLocation();
+  const user=useGetCurrentUser({query:{queryKey:getGetCurrentUserQueryKey(),retry:false}});
+  useEffect(()=>{if(user.data?.user?.role==='VOLUNTEER')setLocation('/admin');},[user.data,setLocation]);
+  return <AdminShell title="Volunteers">
+    <PageTitle eyebrow="ACCESS CONTROL" title="Volunteer Accounts" detail="Create separate console logins. Volunteers can edit event operations, but only administrators can manage accounts."/>
+    {user.data?.user?.role==='ADMIN'?<><p className="mb-6 max-w-3xl text-sm leading-relaxed text-[#b9c4d5]">When the event starts, every registered team gets a random checkpoint order. Starting checkpoints are spread as evenly as possible across active checkpoints.</p><VolunteerAccountsPanel/></>:<Loading text="Checking account permissions…"/>}
+  </AdminShell>;
+}
+
 function AdminOverviewPage() {
   const overview=useGetAdminOverview({query:{queryKey:getGetAdminOverviewQueryKey(),refetchInterval:6000}});
   const teams=useGetTeams({query:{queryKey:getGetTeamsQueryKey(),refetchInterval:6000}});

@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import bcrypt from "bcrypt";
 import {
   BulkCreateTeamsBody,
   BulkCreateTeamsResponse,
@@ -6,6 +7,10 @@ import {
   CreateCheckpointResponse,
   CreateTeamBody,
   CreateTeamResponse,
+  CreateVolunteerBody,
+  CreateVolunteerResponse,
+  DeleteVolunteerAccountParams,
+  DeleteVolunteerAccountResponse,
   DeactivateCheckpointParams,
   DeactivateCheckpointResponse,
   DeleteTeamParams,
@@ -16,7 +21,11 @@ import {
   GetCheckpointsResponse,
   GetGameSettingsResponse,
   GetTeamsResponse,
+  GetVolunteerAccountsResponse,
   PauseEventResponse,
+  ResetVolunteerPasswordBody,
+  ResetVolunteerPasswordParams,
+  ResetVolunteerPasswordResponse,
   ResetTeamParams,
   ResetTeamResponse,
   ReleaseTeamLoginParams,
@@ -37,6 +46,7 @@ import { GAME } from "../lib/constants";
 import {
   createPasscodeHash,
   createProvisioningPasscode,
+  assignRoutesForRegisteredTeams,
   getEventStatus,
   getSettings,
   loadAdminOverview,
@@ -47,6 +57,7 @@ import {
 import { prisma } from "../lib/prisma";
 import {
   emitToAdmins,
+  disconnectAdminAccountSessions,
   disconnectTeamSessions,
   publishEventStatus,
   publishTeamTarget,
@@ -54,13 +65,137 @@ import {
 } from "../lib/realtime";
 
 const router: IRouter = Router();
-router.use("/admin", requireAuth, requireRole("ADMIN"));
+router.use("/admin", requireAuth, requireRole("ADMIN", "VOLUNTEER"));
 
 function isUniqueConstraint(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002"
   );
 }
+
+router.get(
+  "/admin/volunteers",
+  requireRole("ADMIN"),
+  async (_req, res): Promise<void> => {
+    const accounts = await prisma.admin.findMany({
+      where: { role: "VOLUNTEER" },
+      select: { id: true, username: true },
+      orderBy: { username: "asc" },
+    });
+    res.json(GetVolunteerAccountsResponse.parse(accounts));
+  },
+);
+
+router.post(
+  "/admin/volunteers",
+  requireRole("ADMIN"),
+  async (req, res): Promise<void> => {
+    const parsed = CreateVolunteerBody.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+    if (Buffer.byteLength(parsed.data.password, "utf8") > 72) {
+      res.status(400).json({ error: "Password must be no more than 72 UTF-8 bytes." });
+      return;
+    }
+
+    const username = parsed.data.username.trim().toLowerCase();
+    const duplicate = await prisma.admin.findFirst({
+      where: { username: { equals: username, mode: "insensitive" } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      res.status(409).json({ error: "An account with that username already exists." });
+      return;
+    }
+
+    try {
+      const account = await prisma.admin.create({
+        data: {
+          username,
+          passwordHash: await bcrypt.hash(parsed.data.password, 12),
+          role: "VOLUNTEER",
+        },
+        select: { id: true, username: true },
+      });
+      res.status(201).json(CreateVolunteerResponse.parse(account));
+    } catch (error) {
+      if (isUniqueConstraint(error)) {
+        res.status(409).json({ error: "An account with that username already exists." });
+        return;
+      }
+      req.log.error({ err: error }, "Unable to create volunteer account");
+      res.status(500).json({ error: "Could not create volunteer account." });
+    }
+  },
+);
+
+router.patch(
+  "/admin/volunteers/:id/password",
+  requireRole("ADMIN"),
+  async (req, res): Promise<void> => {
+    const params = ResetVolunteerPasswordParams.safeParse(req.params);
+    const parsed = ResetVolunteerPasswordBody.safeParse(req.body);
+    if (!params.success || !parsed.success) {
+      res.status(400).json({ error: params.error?.message ?? parsed.error?.message });
+      return;
+    }
+    if (Buffer.byteLength(parsed.data.password, "utf8") > 72) {
+      res.status(400).json({ error: "Password must be no more than 72 UTF-8 bytes." });
+      return;
+    }
+
+    const account = await prisma.admin.findFirst({
+      where: { id: params.data.id, role: "VOLUNTEER" },
+      select: { id: true, username: true },
+    });
+    if (!account) {
+      res.status(404).json({ error: "Volunteer account not found." });
+      return;
+    }
+
+    try {
+      const updated = await prisma.admin.updateMany({
+        where: { id: account.id, role: "VOLUNTEER" },
+        data: {
+          passwordHash: await bcrypt.hash(parsed.data.password, 12),
+          sessionVersion: { increment: 1 },
+        },
+      });
+      if (!updated.count) {
+        res.status(404).json({ error: "Volunteer account not found." });
+        return;
+      }
+      disconnectAdminAccountSessions(account.id);
+      res.json(ResetVolunteerPasswordResponse.parse(account));
+    } catch (error) {
+      req.log.error({ err: error, volunteerId: account.id }, "Unable to reset volunteer password");
+      res.status(500).json({ error: "Could not reset volunteer password." });
+    }
+  },
+);
+
+router.delete(
+  "/admin/volunteers/:id",
+  requireRole("ADMIN"),
+  async (req, res): Promise<void> => {
+    const params = DeleteVolunteerAccountParams.safeParse(req.params);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    const deleted = await prisma.admin.deleteMany({
+      where: { id: params.data.id, role: "VOLUNTEER" },
+    });
+    if (!deleted.count) {
+      res.status(404).json({ error: "Volunteer account not found." });
+      return;
+    }
+    disconnectAdminAccountSessions(params.data.id);
+    res.json(DeleteVolunteerAccountResponse.parse({ ok: true }));
+  },
+);
 
 function csvCell(value: string | number | null | undefined): string {
   const text = String(value ?? "");
@@ -487,10 +622,23 @@ async function setEventStatus(
   return result.status;
 }
 
-router.post("/admin/event/start", async (_req, res): Promise<void> => {
-  const status = await setEventStatus("ACTIVE");
-  await publishEventStatus();
-  res.json(StartEventResponse.parse({ status }));
+router.post("/admin/event/start", async (req, res): Promise<void> => {
+  try {
+    await assignRoutesForRegisteredTeams();
+    const status = await setEventStatus("ACTIVE");
+    await publishEventStatus();
+    res.json(StartEventResponse.parse({ status }));
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("at least one active checkpoint")
+    ) {
+      res.status(409).json({ error: error.message });
+      return;
+    }
+    req.log.error({ err: error }, "Unable to start event");
+    res.status(500).json({ error: "Could not start event." });
+  }
 });
 
 router.post("/admin/event/pause", async (_req, res): Promise<void> => {
