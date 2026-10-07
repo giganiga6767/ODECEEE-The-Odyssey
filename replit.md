@@ -34,6 +34,7 @@ Mobile-first NITK GPS treasure hunt presented by IET NITK, with a separate volun
 - The server validates capture distance and accuracy from consecutive location updates; clients cannot submit a capture directly.
 - Event status, passcodes, teams, checkpoints, settings, and result export are managed in the admin and volunteer console.
 - Volunteers use separate accounts with full event-operation permissions. Only admins can create, reset, or delete volunteer accounts.
+- Each team code is bound to one browser/device; admin and volunteer accounts may have multiple concurrent sessions.
 - Event start assigns random checkpoint orders to all registered teams and balances first stops across the active checkpoints.
 
 ## Operational constraints
