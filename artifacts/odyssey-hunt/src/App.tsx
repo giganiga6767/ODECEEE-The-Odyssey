@@ -137,6 +137,7 @@ function Routed() {
   const [path] = useLocation();
   return <ErrorBoundary resetKey={path}><Starfield/><Switch>
     <Route path="/" component={TeamEntry}/><Route path="/voyage" component={Voyage}/>
+    {import.meta.env.DEV && <Route path="/__preview/student" component={StudentSamplePreview}/>}
     <Route path="/admin/login" component={AdminLogin}/>
     <Route path="/admin" component={AdminOverviewPage}/><Route path="/admin/checkpoints" component={CheckpointsPage}/>
     <Route path="/admin/teams" component={TeamsPage}/><Route path="/admin/settings" component={SettingsPage}/>
@@ -446,6 +447,74 @@ function Voyage() {
       {debugEnabled&&<section className="mt-5 border border-dashed border-[#d4af3770] bg-[#d4af3709] p-4" data-testid="panel-gps-simulator"><div className="flex items-center justify-between"><div><p className="label text-[#d4af37]">DEBUG · GPS SIMULATOR</p><p className="mt-1 text-xs text-[#b9c4d5]">Local signal only · current target only</p></div><button onClick={toggleSimulator} className={`min-h-11 border px-3 text-xs ${simMode?'border-[#73c99970] text-[#a7d7bd]':'border-[#d4af3750] text-[#f2d98a]'}`} data-testid="button-toggle-gps-simulator">{simMode?'Disable simulator':'Enable simulator'}</button></div><button disabled={!simMode} onClick={walkTowardTarget} className="mt-3 flex min-h-11 w-full items-center justify-center gap-2 border border-[#31486d] text-sm text-[#ede6d6] disabled:opacity-40" data-testid="button-walk-toward-target"><Crosshair size={15}/> Walk 12 metres toward target</button></section>}
       <div className="mt-5 flex justify-between text-[11px] text-[#8191a8]"><span>NO MAP. NO SHORTCUTS.</span><span>WALK TOGETHER</span></div>
     </div><div className="wave"/>
+  </main>;
+}
+
+function StudentSamplePreview() {
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(42);
+  const remaining = 24;
+  return <main className="relative min-h-[100dvh] overflow-hidden px-5 pb-[max(26px,env(safe-area-inset-bottom))] pt-4">
+    <header className="relative z-10 flex items-center justify-between border-b border-[#d4af3725] pb-4">
+      <Brand/>
+      <div className="text-right"><div className="label">VOYAGER</div><div className="mt-1 font-cinzel text-sm">Team Meridian</div></div>
+    </header>
+    <div className="relative z-10 mx-auto max-w-md pt-4">
+      <div className="mb-4 border border-[#9c7a4b] bg-[#f1e4c4] px-3 py-2 text-xs leading-relaxed text-[#2a1b10]" role="note">
+        <span className="font-semibold tracking-[.12em]">SAMPLE PREVIEW</span>
+        <span className="ml-2">Active voyage · simulated team and location</span>
+      </div>
+      <div className="mb-3 flex items-center gap-2 border border-[#71aa8b70] bg-[#71aa8b18] px-3 py-2 text-xs text-[#385028]">
+        <span className="h-2 w-2 rounded-full bg-[#50834b]"/>The heavens are clear <span className="ml-auto text-[10px] tracking-widest">SIMULATED</span>
+      </div>
+      <div className="mb-4 flex items-center gap-2 text-[10px] text-[#5c4026]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#50834b]"/>Crew link secure
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="label text-[#5c4026]">THE 39-SECOND ORACLE</p>
+        <span className="text-xs text-[#5c4026]">2 / 8 waypoints</span>
+      </div>
+      <div className="mt-3 flex flex-col items-center">
+        <div className="relative grid h-[min(76vw,300px)] w-[min(76vw,300px)] place-items-center" role="img" aria-label={`Sample compass pointing Northeast, refresh in ${remaining} seconds`}>
+          <svg className="absolute inset-0 h-full w-full -rotate-90" viewBox="0 0 220 220" aria-hidden="true">
+            <circle cx="110" cy="110" r="101" fill="none" stroke="#9c7a4b66" strokeWidth="2"/>
+            <circle cx="110" cy="110" r="101" fill="none" stroke="#8b2e1f" strokeWidth="3" strokeDasharray={`${(remaining/39)*634} 634`} strokeLinecap="round"/>
+          </svg>
+          <div className="compass-ring absolute inset-[5%] rounded-full border border-[#9c7a4b55]"/>
+          <span className="absolute top-[9%] font-cinzel text-[10px] text-[#5c4026]">N</span>
+          <span className="absolute right-[9%] font-cinzel text-[10px] text-[#5c4026]">E</span>
+          <span className="absolute bottom-[9%] font-cinzel text-[10px] text-[#5c4026]">S</span>
+          <span className="absolute left-[9%] font-cinzel text-[10px] text-[#5c4026]">W</span>
+          <div className="compass-needle absolute h-[55%] w-[55%]" style={{transform:'rotate(42deg)'}}>
+            <div className="absolute left-1/2 top-[3%] h-[47%] w-[2px] -translate-x-1/2 bg-gradient-to-b from-[#8b2e1f] to-[#d4af37]"/>
+            <div className="absolute left-1/2 top-[50%] h-[38%] w-[2px] -translate-x-1/2 bg-[#557093]"/>
+            <div className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border border-[#8b2e1f] bg-[#f1e4c4]"/>
+          </div>
+          <div className="absolute bottom-[26%] text-center"><span className="font-cinzel text-[10px] tracking-widest text-[#5c4026]">{remaining} SEC</span></div>
+        </div>
+        <p className="mt-2 font-cormorant text-xl italic text-[#5c4026]">The Oracle whispers: Northeast</p>
+        <p className="mt-1 text-xs text-[#5c4026]">Near · bearing renews every 39 seconds</p>
+      </div>
+      <section className="panel mt-5 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2"><Siren size={17} className="text-[#8b2e1f]"/><div><p className="label">THE SIREN’S SONG</p><p className="mt-1 font-cormorant text-lg text-[#2a1b10]">A song draws nearer</p></div></div>
+          <div className="flex gap-1" role="img" aria-label="Sample Siren intensity 3 of 5">{[0,1,2,3,4].map(i=><span key={i} className={`h-5 w-1 rounded-full ${i<3?'bg-[#8b2e1f]':'bg-[#b5a17e]'}`}/>)}</div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button onClick={()=>setMuted(!muted)} className="grid h-11 w-11 shrink-0 place-items-center border border-[#9c7a4b] text-[#2a1b10]" aria-label={muted?'Enable sample sound':'Mute sample sound'} title="Preview control only; no audio is played">{muted?<VolumeX size={17}/>:<Volume2 size={17}/>}</button>
+          <input type="range" min="0" max="100" value={volume} onChange={e=>setVolume(Number(e.target.value))} className="w-full accent-[#8b2e1f]" aria-label="Sample Siren volume"/>
+          <span className="w-8 text-right text-xs text-[#5c4026]">{volume}%</span>
+        </div>
+      </section>
+      <div className="mt-5 border-t border-[#9c7a4b80] pt-4">
+        <div className="flex items-start gap-3">
+          <MapPin size={17} className="mt-0.5 text-[#8b2e1f]"/>
+          <div><p className="label">CURRENT DESTINATION</p><p className="mt-1 font-cinzel text-base">North Pier Beacon</p><p className="mt-1 font-cormorant text-lg italic text-[#5c4026]">Follow the stone path until the coast opens to the north.</p></div>
+        </div>
+      </div>
+      <div className="mt-5 flex justify-between text-[11px] text-[#5c4026]"><span>NO MAP. NO SHORTCUTS.</span><span>WALK TOGETHER</span></div>
+      <Link href="/" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm text-[#5c4026] underline underline-offset-4"><ArrowLeft size={15}/>Back to team entry</Link>
+    </div>
   </main>;
 }
 
