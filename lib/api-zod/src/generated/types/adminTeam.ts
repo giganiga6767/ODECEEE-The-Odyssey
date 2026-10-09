@@ -41,6 +41,7 @@ export interface AdminTeam {
   /** @nullable */
   lastSeenAt: Date | null;
   suspicious: boolean;
+  qualifiedForRoundTwo: boolean;
   completionCount: number;
   assignedRoute: AdminRouteEntry[];
   completions: Completion[];

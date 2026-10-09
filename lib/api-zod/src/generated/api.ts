@@ -94,6 +94,7 @@ export const GetCurrentUserResponse = zod.object({
  */
 export const StartVoyageResponse = zod.object({
   "eventStatus": zod.enum(['NOT_STARTED', 'ACTIVE', 'PAUSED', 'ENDED']),
+  "currentRound": zod.union([zod.literal(1),zod.literal(2)]),
   "team": zod.union([zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -101,7 +102,8 @@ export const StartVoyageResponse = zod.object({
   "startedAt": zod.coerce.date().nullable(),
   "finishedAt": zod.coerce.date().nullable(),
   "currentIndex": zod.number().int(),
-  "totalCheckpoints": zod.number().int()
+  "totalCheckpoints": zod.number().int(),
+  "qualifiedForRoundTwo": zod.boolean()
 }),zod.null()]),
   "currentCheckpoint": zod.union([zod.object({
   "id": zod.string(),
@@ -119,7 +121,8 @@ export const StartVoyageResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 })
 
@@ -129,6 +132,7 @@ export const StartVoyageResponse = zod.object({
  */
 export const GetGameStateResponse = zod.object({
   "eventStatus": zod.enum(['NOT_STARTED', 'ACTIVE', 'PAUSED', 'ENDED']),
+  "currentRound": zod.union([zod.literal(1),zod.literal(2)]),
   "team": zod.union([zod.object({
   "id": zod.string(),
   "name": zod.string(),
@@ -136,7 +140,8 @@ export const GetGameStateResponse = zod.object({
   "startedAt": zod.coerce.date().nullable(),
   "finishedAt": zod.coerce.date().nullable(),
   "currentIndex": zod.number().int(),
-  "totalCheckpoints": zod.number().int()
+  "totalCheckpoints": zod.number().int(),
+  "qualifiedForRoundTwo": zod.boolean()
 }),zod.null()]),
   "currentCheckpoint": zod.union([zod.object({
   "id": zod.string(),
@@ -154,7 +159,8 @@ export const GetGameStateResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 })
 
@@ -170,6 +176,7 @@ export const GetCheckpointsResponseItem = zod.object({
   "radiusM": zod.number(),
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 export const GetCheckpointsResponse = zod.array(GetCheckpointsResponseItem)
@@ -198,7 +205,8 @@ export const CreateCheckpointBody = zod.object({
   "lat": zod.number().min(createCheckpointBodyLatMin).max(createCheckpointBodyLatMax),
   "lng": zod.number().min(createCheckpointBodyLngMin).max(createCheckpointBodyLngMax),
   "radiusM": zod.number().min(createCheckpointBodyRadiusMMin).max(createCheckpointBodyRadiusMMax),
-  "hint": zod.string().max(createCheckpointBodyHintMax).nullish()
+  "hint": zod.string().max(createCheckpointBodyHintMax).nullish(),
+  "isFinalStop": zod.boolean().optional()
 })
 
 export const CreateCheckpointResponse = zod.object({
@@ -209,6 +217,7 @@ export const CreateCheckpointResponse = zod.object({
   "radiusM": zod.number(),
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 
@@ -240,7 +249,8 @@ export const UpdateCheckpointBody = zod.object({
   "lat": zod.number().min(updateCheckpointBodyLatMin).max(updateCheckpointBodyLatMax),
   "lng": zod.number().min(updateCheckpointBodyLngMin).max(updateCheckpointBodyLngMax),
   "radiusM": zod.number().min(updateCheckpointBodyRadiusMMin).max(updateCheckpointBodyRadiusMMax),
-  "hint": zod.string().max(updateCheckpointBodyHintMax).nullish()
+  "hint": zod.string().max(updateCheckpointBodyHintMax).nullish(),
+  "isFinalStop": zod.boolean().optional()
 })
 
 export const UpdateCheckpointResponse = zod.object({
@@ -251,6 +261,7 @@ export const UpdateCheckpointResponse = zod.object({
   "radiusM": zod.number(),
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
   "createdAt": zod.coerce.date()
 })
 
@@ -290,11 +301,13 @@ export const GetTeamsResponseItem = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -306,7 +319,8 @@ export const GetTeamsResponseItem = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 })
 export const GetTeamsResponse = zod.array(GetTeamsResponseItem)
@@ -347,11 +361,13 @@ export const CreateTeamResponse = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -363,7 +379,8 @@ export const CreateTeamResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 }),
   "passcode": zod.string()
@@ -402,11 +419,13 @@ export const BulkCreateTeamsResponseItem = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -418,7 +437,8 @@ export const BulkCreateTeamsResponseItem = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 }),
   "passcode": zod.string()
@@ -464,11 +484,13 @@ export const UpdateTeamResponse = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -480,7 +502,8 @@ export const UpdateTeamResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 })
 
@@ -525,11 +548,13 @@ export const ResetTeamResponse = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -541,7 +566,8 @@ export const ResetTeamResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 }),
   "passcode": zod.string()
@@ -588,11 +614,13 @@ export const RegenerateTeamCodeResponse = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -604,10 +632,74 @@ export const RegenerateTeamCodeResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 }),
   "passcode": zod.string()
+})
+
+
+/**
+ * @summary Select or remove a team from Round 2
+ */
+export const UpdateRoundTwoQualificationParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const UpdateRoundTwoQualificationBody = zod.object({
+  "qualified": zod.boolean()
+})
+
+export const UpdateRoundTwoQualificationResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "members": zod.string().nullable(),
+  "codeHint": zod.string(),
+  "leaderName": zod.string().nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "lastLoginAt": zod.coerce.date().nullable(),
+  "userAgent": zod.string().nullable(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "currentIndex": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "currentCheckpoint": zod.string().nullable(),
+  "lastLat": zod.number().nullable(),
+  "lastLng": zod.number().nullable(),
+  "lastAccuracy": zod.number().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
+  "completionCount": zod.number().int(),
+  "assignedRoute": zod.array(zod.object({
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "radiusM": zod.number(),
+  "isActive": zod.boolean()
+})),
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "completedAt": zod.coerce.date(),
+  "distanceAtCaptureM": zod.number(),
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
+}))
+})
+
+
+/**
+ * @summary Start Round 2 for volunteer-selected teams
+ */
+export const StartRoundTwoResponse = zod.object({
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'PAUSED', 'ENDED'])
 })
 
 
@@ -616,6 +708,7 @@ export const RegenerateTeamCodeResponse = zod.object({
  */
 export const GetAdminOverviewResponse = zod.object({
   "eventStatus": zod.enum(['NOT_STARTED', 'ACTIVE', 'PAUSED', 'ENDED']),
+  "currentRound": zod.union([zod.literal(1),zod.literal(2)]),
   "teamCount": zod.number().int(),
   "activeCount": zod.number().int(),
   "finishedCount": zod.number().int(),
@@ -642,11 +735,13 @@ export const GetAdminOverviewResponse = zod.object({
   "lastAccuracy": zod.number().nullable(),
   "lastSeenAt": zod.coerce.date().nullable(),
   "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
   "completionCount": zod.number().int(),
   "assignedRoute": zod.array(zod.object({
   "checkpointId": zod.string(),
   "checkpointName": zod.string(),
   "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
@@ -658,7 +753,8 @@ export const GetAdminOverviewResponse = zod.object({
   "checkpointName": zod.string(),
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
-  "accuracyM": zod.number()
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)])
 }))
 })),
   "recentCompletions": zod.array(zod.object({

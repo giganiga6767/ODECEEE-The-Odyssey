@@ -340,6 +340,41 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ProvisionedTeam"
+  /admin/teams/{id}/round-two-qualification:
+    patch:
+      operationId: updateRoundTwoQualification
+      tags: [admin]
+      summary: Select or remove a team from Round 2
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoundTwoQualificationInput"
+      responses:
+        "200":
+          description: Updated qualification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+  /admin/event/round-two/start:
+    post:
+      operationId: startRoundTwo
+      tags: [admin]
+      summary: Start Round 2 for volunteer-selected teams
+      responses:
+        "200":
+          description: Round 2 is active
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EventStatusResponse"
   /admin/overview:
     get:
       operationId: getAdminOverview
@@ -570,8 +605,9 @@ components:
         radiusM: { type: number }
         hint: { type: ["string", "null"] }
         isActive: { type: boolean }
+        isFinalStop: { type: boolean }
         createdAt: { type: string, format: date-time }
-      required: [id, name, lat, lng, radiusM, hint, isActive, createdAt]
+      required: [id, name, lat, lng, radiusM, hint, isActive, isFinalStop, createdAt]
     CheckpointInput:
       type: object
       properties:
@@ -580,6 +616,7 @@ components:
         lng: { type: number, minimum: -180, maximum: 180 }
         radiusM: { type: number, minimum: 5, maximum: 200 }
         hint: { type: ["string", "null"], maxLength: 500 }
+        isFinalStop: { type: boolean }
       required: [name, lat, lng, radiusM]
     TeamInput:
       type: object
@@ -597,6 +634,11 @@ components:
       properties:
         name: { type: string, minLength: 1, maxLength: 80 }
         members: { type: ["string", "null"], maxLength: 500 }
+    RoundTwoQualificationInput:
+      type: object
+      properties:
+        qualified: { type: boolean }
+      required: [qualified]
     TeamStatus:
       type: string
       enum: [NOT_STARTED, ACTIVE, FINISHED]
@@ -622,6 +664,7 @@ components:
         lastAccuracy: { type: ["number", "null"] }
         lastSeenAt: { type: ["string", "null"], format: date-time }
         suspicious: { type: boolean }
+        qualifiedForRoundTwo: { type: boolean }
         completionCount: { type: integer }
         assignedRoute:
           type: array
@@ -629,18 +672,19 @@ components:
         completions:
           type: array
           items: { $ref: "#/components/schemas/Completion" }
-      required: [id, name, members, codeHint, leaderName, claimedAt, lastLoginAt, userAgent, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, completionCount, assignedRoute, completions]
+      required: [id, name, members, codeHint, leaderName, claimedAt, lastLoginAt, userAgent, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, qualifiedForRoundTwo, completionCount, assignedRoute, completions]
     AdminRouteEntry:
       type: object
       properties:
         checkpointId: { type: string }
         checkpointName: { type: string }
         orderIndex: { type: integer }
+        round: { type: integer, enum: [1, 2] }
         lat: { type: number }
         lng: { type: number }
         radiusM: { type: number }
         isActive: { type: boolean }
-      required: [checkpointId, checkpointName, orderIndex, lat, lng, radiusM, isActive]
+      required: [checkpointId, checkpointName, orderIndex, round, lat, lng, radiusM, isActive]
     ProvisionedTeam:
       type: object
       properties:
@@ -656,7 +700,8 @@ components:
         completedAt: { type: string, format: date-time }
         distanceAtCaptureM: { type: number }
         accuracyM: { type: number }
-      required: [id, checkpointId, checkpointName, completedAt, distanceAtCaptureM, accuracyM]
+        round: { type: integer, enum: [1, 2] }
+      required: [id, checkpointId, checkpointName, completedAt, distanceAtCaptureM, accuracyM, round]
     GameCheckpoint:
       type: object
       properties:
@@ -671,6 +716,7 @@ components:
       type: object
       properties:
         eventStatus: { type: string, enum: [NOT_STARTED, ACTIVE, PAUSED, ENDED] }
+        currentRound: { type: integer, enum: [1, 2] }
         team:
           oneOf:
             - $ref: "#/components/schemas/GameTeamStatus"
@@ -684,7 +730,7 @@ components:
         completions:
           type: array
           items: { $ref: "#/components/schemas/Completion" }
-      required: [eventStatus, team, currentCheckpoint, progress, total, completions]
+      required: [eventStatus, currentRound, team, currentCheckpoint, progress, total, completions]
     GameTeamStatus:
       type: object
       properties:
@@ -695,7 +741,8 @@ components:
         finishedAt: { type: ["string", "null"], format: date-time }
         currentIndex: { type: integer }
         totalCheckpoints: { type: integer }
-      required: [id, name, status, startedAt, finishedAt, currentIndex, totalCheckpoints]
+        qualifiedForRoundTwo: { type: boolean }
+      required: [id, name, status, startedAt, finishedAt, currentIndex, totalCheckpoints, qualifiedForRoundTwo]
     GameSettings:
       type: object
       properties:
@@ -718,6 +765,7 @@ components:
       type: object
       properties:
         eventStatus: { type: string, enum: [NOT_STARTED, ACTIVE, PAUSED, ENDED] }
+        currentRound: { type: integer, enum: [1, 2] }
         teamCount: { type: integer }
         activeCount: { type: integer }
         finishedCount: { type: integer }
@@ -736,5 +784,5 @@ components:
               checkpointName: { type: string }
               completedAt: { type: string, format: date-time }
             required: [teamName, checkpointName, completedAt]
-      required: [eventStatus, teamCount, activeCount, finishedCount, stalledCount, checkpointCount, completionCount, leaderboard, recentCompletions]
+      required: [eventStatus, currentRound, teamCount, activeCount, finishedCount, stalledCount, checkpointCount, completionCount, leaderboard, recentCompletions]
 

@@ -93,6 +93,7 @@ export interface Checkpoint {
   /** @nullable */
   hint: string | null;
   isActive: boolean;
+  isFinalStop: boolean;
   createdAt: string;
 }
 
@@ -122,6 +123,7 @@ export interface CheckpointInput {
      * @nullable
      */
   hint?: string | null;
+  isFinalStop?: boolean;
 }
 
 export interface TeamInput {
@@ -158,6 +160,10 @@ export interface TeamUpdateInput {
   members?: string | null;
 }
 
+export interface RoundTwoQualificationInput {
+  qualified: boolean;
+}
+
 export type TeamStatus = typeof TeamStatus[keyof typeof TeamStatus];
 
 
@@ -167,15 +173,32 @@ export const TeamStatus = {
   FINISHED: 'FINISHED',
 } as const;
 
+export type AdminRouteEntryRound = typeof AdminRouteEntryRound[keyof typeof AdminRouteEntryRound];
+
+
+export const AdminRouteEntryRound = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
 export interface AdminRouteEntry {
   checkpointId: string;
   checkpointName: string;
   orderIndex: number;
+  round: AdminRouteEntryRound;
   lat: number;
   lng: number;
   radiusM: number;
   isActive: boolean;
 }
+
+export type CompletionRound = typeof CompletionRound[keyof typeof CompletionRound];
+
+
+export const CompletionRound = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
 
 export interface Completion {
   id: string;
@@ -184,6 +207,7 @@ export interface Completion {
   completedAt: string;
   distanceAtCaptureM: number;
   accuracyM: number;
+  round: CompletionRound;
 }
 
 export interface AdminTeam {
@@ -218,6 +242,7 @@ export interface AdminTeam {
   /** @nullable */
   lastSeenAt: string | null;
   suspicious: boolean;
+  qualifiedForRoundTwo: boolean;
   completionCount: number;
   assignedRoute: AdminRouteEntry[];
   completions: Completion[];
@@ -248,6 +273,14 @@ export const GameStateEventStatus = {
   ENDED: 'ENDED',
 } as const;
 
+export type GameStateCurrentRound = typeof GameStateCurrentRound[keyof typeof GameStateCurrentRound];
+
+
+export const GameStateCurrentRound = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
 export interface GameTeamStatus {
   id: string;
   name: string;
@@ -258,10 +291,12 @@ export interface GameTeamStatus {
   finishedAt: string | null;
   currentIndex: number;
   totalCheckpoints: number;
+  qualifiedForRoundTwo: boolean;
 }
 
 export interface GameState {
   eventStatus: GameStateEventStatus;
+  currentRound: GameStateCurrentRound;
   team: GameTeamStatus | null;
   currentCheckpoint: GameCheckpoint | null;
   progress: number;
@@ -317,6 +352,14 @@ export const AdminOverviewEventStatus = {
   ENDED: 'ENDED',
 } as const;
 
+export type AdminOverviewCurrentRound = typeof AdminOverviewCurrentRound[keyof typeof AdminOverviewCurrentRound];
+
+
+export const AdminOverviewCurrentRound = {
+  NUMBER_1: 1,
+  NUMBER_2: 2,
+} as const;
+
 export type AdminOverviewRecentCompletionsItem = {
   teamName: string;
   checkpointName: string;
@@ -325,6 +368,7 @@ export type AdminOverviewRecentCompletionsItem = {
 
 export interface AdminOverview {
   eventStatus: AdminOverviewEventStatus;
+  currentRound: AdminOverviewCurrentRound;
   teamCount: number;
   activeCount: number;
   finishedCount: number;

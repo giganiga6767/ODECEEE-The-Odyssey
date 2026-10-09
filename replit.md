@@ -30,12 +30,14 @@ Mobile-first NITK GPS treasure hunt presented by IET NITK, with a separate volun
 ## Product behavior
 
 - Teams see only their current checkpoint. The volunteer-only admin view contains team positions and assigned routes.
-- The oracle direction and distance band refresh on a 39-second cycle; GPS fixes update refs and server telemetry between cycles.
+- Compass directions and distance bands refresh every 3 seconds; GPS fixes and the proximity Siren update between direction refreshes.
 - The server validates capture distance and accuracy from consecutive location updates; clients cannot submit a capture directly.
 - Event status, passcodes, teams, checkpoints, settings, and result export are managed in the admin and volunteer console.
 - Volunteers use separate accounts with full event-operation permissions. Only admins can create, reset, or delete volunteer accounts.
 - Each team code is bound to one browser/device; admin and volunteer accounts may have multiple concurrent sessions.
-- Event start assigns random checkpoint orders to all registered teams and balances first stops across the active checkpoints.
+- Each route shuffles all active POIs before the same two designated active final stops; first POIs are balanced where possible.
+- After Round 1 ends, volunteers manually select Round 2 teams without a fixed quota. Round 2 starts from Settings and keeps Round 1 routes, capture history, and timing records.
+- Do not add same-day/separate-day settings. Compass direction hints update every 3 seconds.
 
 ## Operational constraints
 

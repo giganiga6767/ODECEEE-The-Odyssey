@@ -54,10 +54,24 @@ model Team {
   lastSeenAt     DateTime?
   sessionVersion Int          @default(0)
   suspicious     Boolean      @default(false)
+  qualifiedForRoundTwo Boolean @default(false)
   routes         TeamRoute[]
   completions    Completion[]
+  rounds         TeamRound[]
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+}
+
+model TeamRound {
+  id         String   @id @default(cuid())
+  teamId     String
+  round      Int      @default(1)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, round])
+  @@index([round])
 }
 
 model Checkpoint {
@@ -68,6 +82,7 @@ model Checkpoint {
   radiusM     Float        @default(30)
   hint        String?
   isActive    Boolean      @default(true)
+  isFinalStop Boolean      @default(false)
   createdAt   DateTime     @default(now())
   routes      TeamRoute[]
   completions Completion[]
@@ -78,11 +93,12 @@ model TeamRoute {
   teamId       String
   checkpointId String
   orderIndex   Int
+  round        Int          @default(1)
   team         Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
   checkpoint   Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
 
-  @@unique([teamId, orderIndex])
-  @@unique([teamId, checkpointId])
+  @@unique([teamId, round, orderIndex])
+  @@unique([teamId, round, checkpointId])
   @@index([checkpointId])
 }
 
@@ -93,10 +109,11 @@ model Completion {
   completedAt        DateTime   @default(now())
   distanceAtCaptureM Float
   accuracyM          Float
+  round              Int        @default(1)
   team               Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
   checkpoint         Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
 
-  @@unique([teamId, checkpointId])
+  @@unique([teamId, round, checkpointId])
   @@index([completedAt])
 }
 
@@ -113,5 +130,6 @@ model EventState {
   status    EventStatus @default(NOT_STARTED)
   startedAt DateTime?
   endedAt   DateTime?
+  currentRound Int @default(1)
   updatedAt DateTime    @updatedAt
 }

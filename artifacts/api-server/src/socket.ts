@@ -5,6 +5,7 @@ import { readSessionToken } from "./lib/auth";
 import { GAME, SESSION_COOKIE } from "./lib/constants";
 import { distanceMeters } from "./lib/haversine";
 import {
+  getEventState,
   getEventStatus,
   getSettings,
   getTeamGameState,
@@ -72,14 +73,16 @@ async function captureCurrentCheckpoint(
   teamId: string,
   position: { lat: number; lng: number; accuracy: number },
 ) {
-  const status = await getEventStatus();
-  if (status !== "ACTIVE") return null;
+  const event = await getEventState();
+  if (event.status !== "ACTIVE") return null;
+  const round = event.currentRound;
 
   const [team, settings] = await Promise.all([
     prisma.team.findUnique({
       where: { id: teamId },
       include: {
         routes: {
+          where: { round },
           include: { checkpoint: true },
           orderBy: { orderIndex: "asc" },
         },
@@ -93,7 +96,7 @@ async function captureCurrentCheckpoint(
     (route) => route.orderIndex === team.currentIndex,
   );
   if (!current || !current.checkpoint.isActive) {
-    await advancePastInactiveCheckpoints(teamId);
+    await advancePastInactiveCheckpoints(teamId, round);
     return null;
   }
 
@@ -114,12 +117,16 @@ async function captureCurrentCheckpoint(
       const latestEvent = await transaction.eventState.findUnique({
         where: { id: "global" },
       });
-      if (latestEvent?.status !== "ACTIVE") return null;
+      if (
+        latestEvent?.status !== "ACTIVE" ||
+        latestEvent.currentRound !== round
+      ) return null;
 
       const latestTeam = await transaction.team.findUnique({
         where: { id: teamId },
         include: {
           routes: {
+            where: { round },
             include: { checkpoint: true },
             orderBy: { orderIndex: "asc" },
           },
@@ -142,8 +149,9 @@ async function captureCurrentCheckpoint(
 
       const alreadyCaptured = await transaction.completion.findUnique({
         where: {
-          teamId_checkpointId: {
+          teamId_round_checkpointId: {
             teamId,
+            round,
             checkpointId: current.checkpointId,
           },
         },
@@ -154,6 +162,7 @@ async function captureCurrentCheckpoint(
       const completion = await transaction.completion.create({
         data: {
           teamId,
+          round,
           checkpointId: current.checkpointId,
           completedAt,
           distanceAtCaptureM: latestDistance,
@@ -171,18 +180,25 @@ async function captureCurrentCheckpoint(
           finishedAt: finished ? completedAt : null,
         },
       });
+      if (finished) {
+        await transaction.teamRound.update({
+          where: { teamId_round: { teamId, round } },
+          data: { finishedAt: completedAt },
+        });
+      }
       return {
         completion,
         finished,
         nextIndex,
         total: latestTeam.routes.length,
+        round,
         startedAt: latestTeam.startedAt,
       };
     });
 
     if (!capture) return null;
 
-    await advancePastInactiveCheckpoints(teamId);
+    await advancePastInactiveCheckpoints(teamId, round);
     const state = await getTeamGameState(teamId);
     if (!state) return null;
 
@@ -196,6 +212,7 @@ async function captureCurrentCheckpoint(
       accuracyM: capture.completion.accuracyM,
       progress: state.progress,
       total: state.total,
+      round: capture.round,
       nextCheckpoint: state.currentCheckpoint,
     };
     emitToTeam(teamId, "checkpoint:captured", payload);
@@ -226,6 +243,7 @@ async function captureCurrentCheckpoint(
       completedAt: capture.completion.completedAt,
       distanceAtCaptureM: capture.completion.distanceAtCaptureM,
       accuracyM: capture.completion.accuracyM,
+      round: capture.round,
     });
     const updated = await loadAdminTeam(teamId);
     if (updated) emitToAdmins("admin:team:update", updated);
@@ -249,9 +267,9 @@ async function handleLocation(socket: ClientSocket, payload: unknown) {
   const teamId = user?.role === "TEAM" ? user.teamId : null;
   if (!teamId) return;
 
-  const [team, status, settings] = await Promise.all([
+    const [team, event, settings] = await Promise.all([
     prisma.team.findUnique({ where: { id: teamId } }),
-    getEventStatus(),
+      getEventState(),
     getSettings(),
   ]);
   if (!team) return;
@@ -299,7 +317,7 @@ async function handleLocation(socket: ClientSocket, payload: unknown) {
     if (updated) emitToAdmins("admin:team:update", updated);
   }
 
-  if (status !== "ACTIVE" || team.status !== "ACTIVE") {
+  if (event.status !== "ACTIVE" || team.status !== "ACTIVE") {
     qualifyingPings.delete(teamId);
     return;
   }
@@ -307,6 +325,7 @@ async function handleLocation(socket: ClientSocket, payload: unknown) {
   const target = await prisma.teamRoute.findFirst({
     where: {
       teamId,
+      round: event.currentRound,
       orderIndex: team.currentIndex,
       checkpoint: { isActive: true },
     },

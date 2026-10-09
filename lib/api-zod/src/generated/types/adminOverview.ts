@@ -5,12 +5,14 @@
  * API for WATT A PLAY 3.0 campus treasure hunt
  * OpenAPI spec version: 1.0.0
  */
+import type { AdminOverviewCurrentRound } from './adminOverviewCurrentRound';
 import type { AdminOverviewEventStatus } from './adminOverviewEventStatus';
 import type { AdminOverviewRecentCompletionsItem } from './adminOverviewRecentCompletionsItem';
 import type { AdminTeam } from './adminTeam';
 
 export interface AdminOverview {
   eventStatus: AdminOverviewEventStatus;
+  currentRound: AdminOverviewCurrentRound;
   teamCount: number;
   activeCount: number;
   finishedCount: number;

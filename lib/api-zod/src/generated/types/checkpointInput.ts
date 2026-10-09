@@ -32,4 +32,5 @@ export interface CheckpointInput {
      * @nullable
      */
   hint?: string | null;
+  isFinalStop?: boolean;
 }

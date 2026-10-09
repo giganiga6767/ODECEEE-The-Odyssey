@@ -17,4 +17,5 @@ export interface GameTeamStatus {
   finishedAt: Date | null;
   currentIndex: number;
   totalCheckpoints: number;
+  qualifiedForRoundTwo: boolean;
 }

@@ -5,6 +5,7 @@
  * API for WATT A PLAY 3.0 campus treasure hunt
  * OpenAPI spec version: 1.0.0
  */
+import type { CompletionRound } from './completionRound';
 
 export interface Completion {
   id: string;
@@ -13,4 +14,5 @@ export interface Completion {
   completedAt: Date;
   distanceAtCaptureM: number;
   accuracyM: number;
+  round: CompletionRound;
 }

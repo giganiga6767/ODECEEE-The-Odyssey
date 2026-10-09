@@ -7,11 +7,13 @@
  */
 import type { Completion } from './completion';
 import type { GameCheckpoint } from './gameCheckpoint';
+import type { GameStateCurrentRound } from './gameStateCurrentRound';
 import type { GameStateEventStatus } from './gameStateEventStatus';
 import type { GameTeamStatus } from './gameTeamStatus';
 
 export interface GameState {
   eventStatus: GameStateEventStatus;
+  currentRound: GameStateCurrentRound;
   team: GameTeamStatus | null;
   currentCheckpoint: GameCheckpoint | null;
   progress: number;

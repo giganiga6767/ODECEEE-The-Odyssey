@@ -15,5 +15,6 @@ export interface Checkpoint {
   /** @nullable */
   hint: string | null;
   isActive: boolean;
+  isFinalStop: boolean;
   createdAt: Date;
 }

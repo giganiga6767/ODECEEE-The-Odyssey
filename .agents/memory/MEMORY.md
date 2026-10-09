@@ -1,2 +1,3 @@
 - [IET NITK logo treatment](iet-nitk-logo-treatment.md) — Keep the supplied logo unframed on parchment and blend its white background into the surface.
 - [Admin console contrast](admin-console-contrast.md) — Keep volunteer/admin controls legible across dark cards and light paper panels.
+- [Treasure-hunt routes and rounds](treasure-hunt-routes-and-rounds.md) — Shuffle the POIs before two shared final stops; volunteers choose Round 2 teams without a preset quota.

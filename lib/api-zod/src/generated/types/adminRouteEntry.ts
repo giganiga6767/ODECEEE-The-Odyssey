@@ -5,11 +5,13 @@
  * API for WATT A PLAY 3.0 campus treasure hunt
  * OpenAPI spec version: 1.0.0
  */
+import type { AdminRouteEntryRound } from './adminRouteEntryRound';
 
 export interface AdminRouteEntry {
   checkpointId: string;
   checkpointName: string;
   orderIndex: number;
+  round: AdminRouteEntryRound;
   lat: number;
   lng: number;
   radiusM: number;

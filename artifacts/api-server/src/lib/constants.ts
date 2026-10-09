@@ -1,5 +1,5 @@
 export const GAME = {
-  oracleRefreshMs: 39_000,
+  oracleRefreshMs: 3_000,
   audioRadiusM: 100,
   locationEmitMs: 7_000,
   heartbeatMs: 20_000,

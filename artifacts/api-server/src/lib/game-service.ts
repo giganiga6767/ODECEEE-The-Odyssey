@@ -7,24 +7,17 @@ import {
 import { GAME } from "./constants";
 import { prisma } from "./prisma";
 
-const adminTeamInclude = {
-  routes: {
-    include: { checkpoint: true },
-    orderBy: { orderIndex: "asc" },
-  },
-  completions: {
-    include: { checkpoint: true },
-    orderBy: { completedAt: "asc" },
-  },
-} satisfies Prisma.TeamInclude;
-
-export async function getEventStatus() {
+export async function getEventState() {
   const event = await prisma.eventState.upsert({
     where: { id: "global" },
     create: { id: "global" },
     update: {},
   });
-  return event.status;
+  return { status: event.status, currentRound: event.currentRound };
+}
+
+export async function getEventStatus() {
+  return (await getEventState()).status;
 }
 
 export async function getSettings() {
@@ -45,10 +38,22 @@ export async function getSettings() {
   });
 }
 
-export async function loadAdminTeam(teamId: string) {
+export async function loadAdminTeam(teamId: string, currentRound?: number) {
+  const round = currentRound ?? (await getEventState()).currentRound;
   const team = await prisma.team.findUnique({
     where: { id: teamId },
-    include: adminTeamInclude,
+    include: {
+      routes: {
+        where: { round },
+        include: { checkpoint: true },
+        orderBy: { orderIndex: "asc" },
+      },
+      completions: {
+        include: { checkpoint: true },
+        orderBy: [{ round: "asc" }, { completedAt: "asc" }],
+      },
+      rounds: { where: { round } },
+    },
   });
   if (!team) return null;
 
@@ -66,8 +71,8 @@ export async function loadAdminTeam(teamId: string) {
     lastLoginAt: team.lastLoginAt,
     userAgent: team.userAgent,
     status: team.status,
-    startedAt: team.startedAt,
-    finishedAt: team.finishedAt,
+    startedAt: team.rounds[0]?.startedAt ?? team.startedAt,
+    finishedAt: team.rounds[0]?.finishedAt ?? team.finishedAt,
     currentIndex: team.currentIndex,
     totalCheckpoints: team.routes.length,
     currentCheckpoint: currentRoute?.checkpoint.isActive
@@ -78,11 +83,13 @@ export async function loadAdminTeam(teamId: string) {
     lastAccuracy: team.lastAccuracy,
     lastSeenAt: team.lastSeenAt,
     suspicious: team.suspicious,
-    completionCount: team.completions.length,
+    qualifiedForRoundTwo: team.qualifiedForRoundTwo,
+    completionCount: team.completions.filter((completion) => completion.round === round).length,
     assignedRoute: team.routes.map((route) => ({
       checkpointId: route.checkpointId,
       checkpointName: route.checkpoint.name,
       orderIndex: route.orderIndex,
+      round: route.round,
       lat: route.checkpoint.lat,
       lng: route.checkpoint.lng,
       radiusM: route.checkpoint.radiusM,
@@ -92,6 +99,7 @@ export async function loadAdminTeam(teamId: string) {
       id: completion.id,
       checkpointId: completion.checkpointId,
       checkpointName: completion.checkpoint.name,
+      round: completion.round,
       completedAt: completion.completedAt,
       distanceAtCaptureM: completion.distanceAtCaptureM,
       accuracyM: completion.accuracyM,
@@ -99,31 +107,38 @@ export async function loadAdminTeam(teamId: string) {
   };
 }
 
-export async function loadAdminTeams() {
+export async function loadAdminTeams(currentRound?: number) {
+  const round = currentRound ?? (await getEventState()).currentRound;
   const teams = await prisma.team.findMany({
     orderBy: [{ createdAt: "asc" }, { name: "asc" }],
     select: { id: true },
   });
-  const detailed = await Promise.all(teams.map(({ id }) => loadAdminTeam(id)));
+  const detailed = await Promise.all(
+    teams.map(({ id }) => loadAdminTeam(id, round)),
+  );
   return detailed.filter((team) => team !== null);
 }
 
 export async function loadAdminOverview() {
-  const [eventStatus, teamData, checkpointCount, completionCount, recent] =
-    await Promise.all([
-      getEventStatus(),
-      loadAdminTeams(),
-      prisma.checkpoint.count({ where: { isActive: true } }),
-      prisma.completion.count(),
-      prisma.completion.findMany({
-        take: 12,
-        orderBy: { completedAt: "desc" },
-        include: { team: true, checkpoint: true },
-      }),
-    ]);
+  const { status: eventStatus, currentRound } = await getEventState();
+  const [teamData, checkpointCount, completionCount, recent] = await Promise.all([
+    loadAdminTeams(currentRound),
+    prisma.checkpoint.count({ where: { isActive: true } }),
+    prisma.completion.count({ where: { round: currentRound } }),
+    prisma.completion.findMany({
+      where: { round: currentRound },
+      take: 12,
+      orderBy: { completedAt: "desc" },
+      include: { team: true, checkpoint: true },
+    }),
+  ]);
 
   const now = Date.now();
-  const leaderboard = [...teamData].sort((a, b) => {
+  const activeRoundTeams =
+    currentRound === 2
+      ? teamData.filter((team) => team.qualifiedForRoundTwo)
+      : teamData;
+  const leaderboard = [...activeRoundTeams].sort((a, b) => {
     if (a.currentIndex !== b.currentIndex) return b.currentIndex - a.currentIndex;
     if (a.status === "FINISHED" && b.status === "FINISHED") {
       return (
@@ -139,11 +154,13 @@ export async function loadAdminOverview() {
 
   return GetAdminOverviewResponse.parse({
     eventStatus,
+    currentRound,
     teamCount: teamData.length,
-    activeCount: teamData.filter((team) => team.status === "ACTIVE").length,
-    finishedCount: teamData.filter((team) => team.status === "FINISHED").length,
+    activeCount: activeRoundTeams.filter((team) => team.status === "ACTIVE").length,
+    finishedCount: activeRoundTeams.filter((team) => team.status === "FINISHED").length,
     stalledCount: teamData.filter(
       (team) =>
+        (currentRound === 1 || team.qualifiedForRoundTwo) &&
         team.status === "ACTIVE" &&
         (!team.lastSeenAt || now - team.lastSeenAt.getTime() > 90_000),
     ).length,
@@ -170,9 +187,10 @@ function shuffled<T>(input: T[]): T[] {
 async function createTeamRoute(
   transaction: Prisma.TransactionClient,
   teamId: string,
+  round: number,
 ) {
   const existing = await transaction.teamRoute.findMany({
-    where: { teamId },
+    where: { teamId, round },
     orderBy: { orderIndex: "asc" },
   });
   if (existing.length) return;
@@ -181,15 +199,17 @@ async function createTeamRoute(
     where: { isActive: true },
     orderBy: { createdAt: "asc" },
   });
-  if (!checkpoints.length) {
-    throw new Error("Add at least one active checkpoint before starting a voyage.");
+  const finalStops = checkpoints.filter((checkpoint) => checkpoint.isFinalStop);
+  const randomStops = checkpoints.filter((checkpoint) => !checkpoint.isFinalStop);
+  if (finalStops.length !== 2 || randomStops.length === 0) {
+    throw new Error("Select exactly two active final stops and at least one active POI before starting a round.");
   }
 
   const otherRoutes = await transaction.teamRoute.findMany({
-    where: { teamId: { not: teamId } },
+    where: { teamId: { not: teamId }, round },
     orderBy: { orderIndex: "asc" },
   });
-  const firstCounts = new Map(checkpoints.map((checkpoint) => [checkpoint.id, 0]));
+  const firstCounts = new Map(randomStops.map((checkpoint) => [checkpoint.id, 0]));
   for (const route of otherRoutes) {
     if (route.orderIndex === 0 && firstCounts.has(route.checkpointId)) {
       firstCounts.set(route.checkpointId, (firstCounts.get(route.checkpointId) ?? 0) + 1);
@@ -206,14 +226,17 @@ async function createTeamRoute(
   );
 
   const leastUsedCount = Math.min(...firstCounts.values());
-  const firstOptions = checkpoints.filter(
+  const firstOptions = randomStops.filter(
     (checkpoint) => firstCounts.get(checkpoint.id) === leastUsedCount,
   );
   const first = firstOptions[randomInt(firstOptions.length)];
-  const remaining = checkpoints.filter((checkpoint) => checkpoint.id !== first.id);
-  let order = [first, ...shuffled(remaining)];
+  const remaining = randomStops.filter((checkpoint) => checkpoint.id !== first.id);
+  const orderedFinalStops = finalStops.sort(
+    (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
+  );
+  let order = [first, ...shuffled(remaining), ...orderedFinalStops];
   for (let attempt = 0; attempt < 500; attempt += 1) {
-    const candidate = [first, ...shuffled(remaining)];
+    const candidate = [first, ...shuffled(remaining), ...orderedFinalStops];
     const uniqueOrder = !otherOrders.includes(
       candidate.map((checkpoint) => checkpoint.id).join("|"),
     );
@@ -226,35 +249,106 @@ async function createTeamRoute(
       teamId,
       checkpointId: checkpoint.id,
       orderIndex,
+      round,
     })),
+  });
+  await transaction.teamRound.upsert({
+    where: { teamId_round: { teamId, round } },
+    create: { teamId, round },
+    update: {},
   });
 }
 
-export async function assignRoutesForRegisteredTeams() {
+export async function assignRoutesForRegisteredTeams(round = 1) {
   await prisma.$transaction(async (transaction) => {
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
     const teams = await transaction.team.findMany({
       orderBy: { createdAt: "asc" },
       select: { id: true },
     });
-    if (teams.length) {
-      const activeCheckpointCount = await transaction.checkpoint.count({
-        where: { isActive: true },
-      });
-      if (!activeCheckpointCount) {
-        throw new Error("Add at least one active checkpoint before starting the event.");
-      }
+    const checkpoints = await transaction.checkpoint.findMany({
+      where: { isActive: true },
+      select: { isFinalStop: true },
+    });
+    if (
+      checkpoints.filter((checkpoint) => checkpoint.isFinalStop).length !== 2 ||
+      checkpoints.filter((checkpoint) => !checkpoint.isFinalStop).length === 0
+    ) {
+      throw new Error("Select exactly two active final stops and at least one active POI before starting a round.");
     }
     for (const team of shuffled(teams)) {
-      await createTeamRoute(transaction, team.id);
+      await createTeamRoute(transaction, team.id, round);
     }
+  });
+}
+
+export async function startRoundTwo() {
+  return prisma.$transaction(async (transaction) => {
+    await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
+    const event = await transaction.eventState.findUnique({ where: { id: "global" } });
+    if (event?.status !== "ENDED" || event.currentRound !== 1) {
+      throw new Error("End Round 1 before opening Round 2.");
+    }
+    const selectedTeams = await transaction.team.findMany({
+      where: { qualifiedForRoundTwo: true },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    });
+    if (!selectedTeams.length) {
+      throw new Error("Select at least one Round 2 team in the team manager first.");
+    }
+    for (const { id } of selectedTeams) {
+      await createTeamRoute(transaction, id, 2);
+    }
+    await transaction.team.updateMany({
+      where: { qualifiedForRoundTwo: true },
+      data: {
+        status: "NOT_STARTED",
+        currentIndex: 0,
+        startedAt: null,
+        finishedAt: null,
+        lastLat: null,
+        lastLng: null,
+        lastAccuracy: null,
+        lastSeenAt: null,
+      },
+    });
+    return transaction.eventState.upsert({
+      where: { id: "global" },
+      create: {
+        id: "global",
+        status: "ACTIVE",
+        currentRound: 2,
+        startedAt: new Date(),
+      },
+      update: {
+        status: "ACTIVE",
+        currentRound: 2,
+        startedAt: new Date(),
+        endedAt: null,
+      },
+    });
   });
 }
 
 export async function startTeamVoyage(teamId: string) {
   return prisma.$transaction(async (transaction) => {
     await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
-    await createTeamRoute(transaction, teamId);
+    const event = await transaction.eventState.findUnique({ where: { id: "global" } });
+    const round = event?.currentRound ?? 1;
+    if (event?.status !== "ACTIVE") {
+      throw new Error("The volunteers have not opened this round yet.");
+    }
+    if (round === 2) {
+      const qualified = await transaction.team.findUnique({
+        where: { id: teamId },
+        select: { qualifiedForRoundTwo: true },
+      });
+      if (!qualified?.qualifiedForRoundTwo) {
+        throw new Error("This team was not selected for Round 2.");
+      }
+    }
+    await createTeamRoute(transaction, teamId, round);
     const currentTeam = await transaction.team.findUnique({
       where: { id: teamId },
     });
@@ -267,16 +361,31 @@ export async function startTeamVoyage(teamId: string) {
         ...(currentTeam.startedAt ? {} : { startedAt: new Date() }),
       },
     });
+    const roundStartedAt = currentTeam.startedAt ?? team.startedAt;
+    await transaction.teamRound.upsert({
+      where: { teamId_round: { teamId, round } },
+      create: { teamId, round, startedAt: roundStartedAt },
+      update: currentTeam.startedAt ? {} : { startedAt: roundStartedAt },
+    });
     return team;
   });
 }
 
-export async function advancePastInactiveCheckpoints(teamId: string) {
+export async function advancePastInactiveCheckpoints(
+  teamId: string,
+  currentRound?: number,
+) {
   return prisma.$transaction(async (transaction) => {
+    const event = await transaction.eventState.findUnique({ where: { id: "global" } });
+    const round = currentRound ?? event?.currentRound ?? 1;
     const team = await transaction.team.findUnique({
       where: { id: teamId },
       include: {
-        routes: { include: { checkpoint: true }, orderBy: { orderIndex: "asc" } },
+        routes: {
+          where: { round },
+          include: { checkpoint: true },
+          orderBy: { orderIndex: "asc" },
+        },
       },
     });
     if (!team) return null;
@@ -291,52 +400,65 @@ export async function advancePastInactiveCheckpoints(teamId: string) {
 
     const finished = index >= team.routes.length;
     if (index !== team.currentIndex || (finished && team.status !== "FINISHED")) {
+      const finishedAt = finished ? new Date() : team.finishedAt;
       await transaction.team.update({
         where: { id: teamId },
         data: {
           currentIndex: index,
           status: finished ? "FINISHED" : team.status,
-          finishedAt: finished ? new Date() : team.finishedAt,
+          finishedAt,
         },
       });
+      if (finished) {
+        await transaction.teamRound.update({
+          where: { teamId_round: { teamId, round } },
+          data: { finishedAt: finishedAt ?? new Date() },
+        });
+      }
     }
     return { currentIndex: index, total: team.routes.length, finished };
   });
 }
 
-export function teamGameSummary(team: Team, totalCheckpoints: number) {
+export function teamGameSummary(
+  team: Team,
+  totalCheckpoints: number,
+  roundTiming?: { startedAt: Date | null; finishedAt: Date | null },
+) {
   return {
     id: team.id,
     name: team.name,
     status: team.status,
-    startedAt: team.startedAt,
-    finishedAt: team.finishedAt,
+    startedAt: roundTiming?.startedAt ?? team.startedAt,
+    finishedAt: roundTiming?.finishedAt ?? team.finishedAt,
     currentIndex: team.currentIndex,
     totalCheckpoints,
+    qualifiedForRoundTwo: team.qualifiedForRoundTwo,
   };
 }
 
 export async function getTeamGameState(teamId: string) {
-  const [team, eventStatus] = await Promise.all([
-    prisma.team.findUnique({
-      where: { id: teamId },
-      include: {
-        routes: {
-          include: { checkpoint: true },
-          orderBy: { orderIndex: "asc" },
-        },
-        completions: {
-          include: { checkpoint: true },
-          orderBy: { completedAt: "asc" },
-        },
+  const { status: eventStatus, currentRound } = await getEventState();
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: {
+      routes: {
+        where: { round: currentRound },
+        include: { checkpoint: true },
+        orderBy: { orderIndex: "asc" },
       },
-    }),
-    getEventStatus(),
-  ]);
+      completions: {
+        include: { checkpoint: true },
+        orderBy: [{ round: "asc" }, { completedAt: "asc" }],
+      },
+      rounds: { where: { round: currentRound } },
+    },
+  });
   if (!team) return null;
+  const eligible = currentRound === 1 || team.qualifiedForRoundTwo;
 
   const activeRoute =
-    eventStatus === "ACTIVE" && team.status !== "FINISHED"
+    eligible && eventStatus === "ACTIVE" && team.status !== "FINISHED"
       ? team.routes.find(
           (route) =>
             route.orderIndex === team.currentIndex && route.checkpoint.isActive,
@@ -345,7 +467,12 @@ export async function getTeamGameState(teamId: string) {
 
   return {
     eventStatus,
-    team: teamGameSummary(team, team.routes.length),
+    currentRound,
+    team: teamGameSummary(
+      team,
+      team.routes.length,
+      team.rounds[0] ?? { startedAt: team.startedAt, finishedAt: team.finishedAt },
+    ),
     currentCheckpoint: activeRoute
       ? {
           id: activeRoute.checkpoint.id,
@@ -365,6 +492,7 @@ export async function getTeamGameState(teamId: string) {
       completedAt: completion.completedAt,
       distanceAtCaptureM: completion.distanceAtCaptureM,
       accuracyM: completion.accuracyM,
+      round: completion.round,
     })),
   };
 }

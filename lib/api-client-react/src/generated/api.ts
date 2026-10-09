@@ -34,6 +34,7 @@ import type {
   HealthStatus,
   OkResponse,
   ProvisionedTeam,
+  RoundTwoQualificationInput,
   TeamInput,
   TeamLoginInput,
   TeamUpdateInput,
@@ -1589,6 +1590,169 @@ export const useRegenerateTeamCode = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getRegenerateTeamCodeMutationOptions(options));
+    }
+
+export const getUpdateRoundTwoQualificationUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/teams/${id}/round-two-qualification`
+}
+
+/**
+ * @summary Select or remove a team from Round 2
+ */
+export const updateRoundTwoQualification = async (id: string,
+    roundTwoQualificationInput: RoundTwoQualificationInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminTeam>(getUpdateRoundTwoQualificationUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(roundTwoQualificationInput)
+  }
+);}
+
+
+
+
+
+export const getUpdateRoundTwoQualificationMutationKey = () => ['updateRoundTwoQualification'] as const;
+
+export const getUpdateRoundTwoQualificationMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoundTwoQualification>>, TError,UpdateRoundTwoQualificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateRoundTwoQualification>>, TError,UpdateRoundTwoQualificationMutationVariables, TContext> => {
+
+const mutationKey = getUpdateRoundTwoQualificationMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateRoundTwoQualification>>, UpdateRoundTwoQualificationMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateRoundTwoQualification(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateRoundTwoQualificationMutationResult = NonNullable<Awaited<ReturnType<typeof updateRoundTwoQualification>>>
+    export type UpdateRoundTwoQualificationMutationBody = BodyType<RoundTwoQualificationInput>
+    export type UpdateRoundTwoQualificationMutationError = ErrorType<unknown>
+    export type UpdateRoundTwoQualificationMutationVariables = {id: string;data: BodyType<RoundTwoQualificationInput>}
+
+    /**
+ * @summary Select or remove a team from Round 2
+ */
+export const useUpdateRoundTwoQualification = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateRoundTwoQualification>>, TError,UpdateRoundTwoQualificationMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateRoundTwoQualification>>,
+        TError,
+        UpdateRoundTwoQualificationMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateRoundTwoQualificationMutationOptions(options));
+    }
+
+export const getStartRoundTwoUrl = () => {
+
+
+
+
+  return `/api/admin/event/round-two/start`
+}
+
+/**
+ * @summary Start Round 2 for volunteer-selected teams
+ */
+export const startRoundTwo = async ( options?: Parameters<typeof customFetch>[1]): Promise<EventStatusResponse> => {
+
+  return customFetch<EventStatusResponse>(getStartRoundTwoUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getStartRoundTwoMutationKey = () => ['startRoundTwo'] as const;
+
+export const getStartRoundTwoMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startRoundTwo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startRoundTwo>>, TError,void, TContext> => {
+
+const mutationKey = getStartRoundTwoMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startRoundTwo>>, void> = () => {
+
+
+          return  startRoundTwo(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartRoundTwoMutationResult = NonNullable<Awaited<ReturnType<typeof startRoundTwo>>>
+
+    export type StartRoundTwoMutationError = ErrorType<unknown>
+
+
+    /**
+ * @summary Start Round 2 for volunteer-selected teams
+ */
+export const useStartRoundTwo = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startRoundTwo>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startRoundTwo>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getStartRoundTwoMutationOptions(options));
     }
 
 export const getGetAdminOverviewUrl = () => {

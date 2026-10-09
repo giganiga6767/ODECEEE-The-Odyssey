@@ -31,6 +31,7 @@ import {
   ReleaseTeamLoginParams,
   ReleaseTeamLoginResponse,
   StartEventResponse,
+  StartRoundTwoResponse,
   UpdateCheckpointBody,
   UpdateCheckpointParams,
   UpdateCheckpointResponse,
@@ -39,6 +40,9 @@ import {
   UpdateTeamBody,
   UpdateTeamParams,
   UpdateTeamResponse,
+  UpdateRoundTwoQualificationBody,
+  UpdateRoundTwoQualificationParams,
+  UpdateRoundTwoQualificationResponse,
 } from "@workspace/api-zod";
 import { Prisma } from "@prisma/client";
 import { requireAuth, requireRole } from "../lib/auth";
@@ -47,6 +51,8 @@ import {
   createPasscodeHash,
   createProvisioningPasscode,
   assignRoutesForRegisteredTeams,
+  startRoundTwo,
+  getEventState,
   getEventStatus,
   getSettings,
   loadAdminOverview,
@@ -217,13 +223,38 @@ router.post("/admin/checkpoints", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const checkpoint = await prisma.checkpoint.create({
-      data: { ...parsed.data, hint: parsed.data.hint ?? null },
+    const checkpoint = await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
+      if (parsed.data.isFinalStop) {
+        const event = await transaction.eventState.upsert({
+          where: { id: "global" },
+          create: { id: "global" },
+          update: {},
+        });
+        if (event.status === "ACTIVE" || event.status === "PAUSED") {
+          throw new Error("FINAL_STOPS_LOCKED");
+        }
+        const finalCount = await transaction.checkpoint.count({
+          where: { isActive: true, isFinalStop: true },
+        });
+        if (finalCount >= 2) throw new Error("TWO_FINAL_STOPS");
+      }
+      return transaction.checkpoint.create({
+        data: { ...parsed.data, hint: parsed.data.hint ?? null },
+      });
     });
     const response = CreateCheckpointResponse.parse(checkpoint);
     emitToAdmins("admin:snapshot", { overview: await loadAdminOverview() });
     res.status(201).json(response);
   } catch (error) {
+    if (error instanceof Error && error.message === "FINAL_STOPS_LOCKED") {
+      res.status(409).json({ error: "Shared final stops cannot be changed while a round is open." });
+      return;
+    }
+    if (error instanceof Error && error.message === "TWO_FINAL_STOPS") {
+      res.status(409).json({ error: "A route can have only two active shared final stops." });
+      return;
+    }
     req.log.error({ err: error }, "Unable to create checkpoint");
     res.status(500).json({ error: "Could not create checkpoint." });
   }
@@ -241,14 +272,52 @@ router.patch("/admin/checkpoints/:id", async (req, res): Promise<void> => {
     return;
   }
   try {
-    const checkpoint = await prisma.checkpoint.update({
-      where: { id: params.data.id },
-      data: { ...parsed.data, hint: parsed.data.hint ?? null },
+    const checkpoint = await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
+      const current = await transaction.checkpoint.findUnique({
+        where: { id: params.data.id },
+      });
+      if (!current) throw new Error("CHECKPOINT_NOT_FOUND");
+      if (
+        parsed.data.isFinalStop !== undefined &&
+        parsed.data.isFinalStop !== current.isFinalStop
+      ) {
+        const event = await transaction.eventState.upsert({
+          where: { id: "global" },
+          create: { id: "global" },
+          update: {},
+        });
+        if (event.status === "ACTIVE" || event.status === "PAUSED") {
+          throw new Error("FINAL_STOPS_LOCKED");
+        }
+        if (parsed.data.isFinalStop && current.isActive) {
+          const finalCount = await transaction.checkpoint.count({
+            where: { id: { not: current.id }, isActive: true, isFinalStop: true },
+          });
+          if (finalCount >= 2) throw new Error("TWO_FINAL_STOPS");
+        }
+      }
+      return transaction.checkpoint.update({
+        where: { id: params.data.id },
+        data: { ...parsed.data, hint: parsed.data.hint ?? null },
+      });
     });
     const response = UpdateCheckpointResponse.parse(checkpoint);
     emitToAdmins("admin:snapshot", { overview: await loadAdminOverview() });
     res.json(response);
   } catch (error) {
+    if (error instanceof Error && error.message === "CHECKPOINT_NOT_FOUND") {
+      res.status(404).json({ error: "Checkpoint not found." });
+      return;
+    }
+    if (error instanceof Error && error.message === "FINAL_STOPS_LOCKED") {
+      res.status(409).json({ error: "Shared final stops cannot be changed while a round is open." });
+      return;
+    }
+    if (error instanceof Error && error.message === "TWO_FINAL_STOPS") {
+      res.status(409).json({ error: "A route can have only two active shared final stops." });
+      return;
+    }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
       res.status(404).json({ error: "Checkpoint not found." });
       return;
@@ -264,6 +333,17 @@ router.delete("/admin/checkpoints/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
+  const event = await getEventState();
+  if (event.status === "ACTIVE" || event.status === "PAUSED") {
+    const finalStop = await prisma.checkpoint.findUnique({
+      where: { id: params.data.id },
+      select: { isActive: true, isFinalStop: true },
+    });
+    if (finalStop?.isActive && finalStop.isFinalStop) {
+      res.status(409).json({ error: "A shared final stop cannot be deactivated while a round is open." });
+      return;
+    }
+  }
   const checkpoint = await prisma.checkpoint.updateMany({
     where: { id: params.data.id, isActive: true },
     data: { isActive: false },
@@ -278,7 +358,11 @@ router.delete("/admin/checkpoints/:id", async (req, res): Promise<void> => {
 
   const teams = await prisma.team.findMany({
     where: { status: "ACTIVE" },
-    include: { routes: { where: { checkpointId: params.data.id } } },
+    include: {
+      routes: {
+        where: { checkpointId: params.data.id, round: event.currentRound },
+      },
+    },
   });
   for (const team of teams) {
     if (team.routes.some((route) => route.orderIndex === team.currentIndex)) {
@@ -471,6 +555,7 @@ router.post("/admin/teams/:id/reset", async (req, res): Promise<void> => {
   await prisma.$transaction([
     prisma.teamRoute.deleteMany({ where: { teamId: existing.id } }),
     prisma.completion.deleteMany({ where: { teamId: existing.id } }),
+    prisma.teamRound.deleteMany({ where: { teamId: existing.id } }),
     prisma.team.update({
       where: { id: existing.id },
       data: {
@@ -486,6 +571,7 @@ router.post("/admin/teams/:id/reset", async (req, res): Promise<void> => {
         startedAt: null,
         finishedAt: null,
         currentIndex: 0,
+        qualifiedForRoundTwo: false,
         lastLat: null,
         lastLng: null,
         lastAccuracy: null,
@@ -623,6 +709,15 @@ async function setEventStatus(
 }
 
 router.post("/admin/event/start", async (req, res): Promise<void> => {
+  const event = await getEventState();
+  if (event.currentRound !== 1 || event.status === "ENDED") {
+    res.status(409).json({ error: "Round 1 has ended. Use the Round 2 controls if another round is planned." });
+    return;
+  }
+  if (event.status === "ACTIVE") {
+    res.status(409).json({ error: "Round 1 is already open." });
+    return;
+  }
   try {
     await assignRoutesForRegisteredTeams();
     const status = await setEventStatus("ACTIVE");
@@ -631,7 +726,8 @@ router.post("/admin/event/start", async (req, res): Promise<void> => {
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message.includes("at least one active checkpoint")
+      (error.message.includes("at least one active checkpoint") ||
+        error.message.includes("exactly two active final stops"))
     ) {
       res.status(409).json({ error: error.message });
       return;
@@ -653,30 +749,134 @@ router.post("/admin/event/end", async (_req, res): Promise<void> => {
   res.json(EndEventResponse.parse({ status }));
 });
 
+router.patch(
+  "/admin/teams/:id/round-two-qualification",
+  async (req, res): Promise<void> => {
+    const params = UpdateRoundTwoQualificationParams.safeParse(req.params);
+    const parsed = UpdateRoundTwoQualificationBody.safeParse(req.body);
+    if (!params.success) {
+      res.status(400).json({ error: params.error.message });
+      return;
+    }
+    if (!parsed.success) {
+      res.status(400).json({ error: parsed.error.message });
+      return;
+    }
+
+    try {
+      await prisma.$transaction(async (transaction) => {
+        await transaction.$executeRaw`SELECT pg_advisory_xact_lock(734921601)`;
+        const event = await transaction.eventState.upsert({
+          where: { id: "global" },
+          create: { id: "global" },
+          update: {},
+        });
+        if (event.status !== "ENDED" || event.currentRound !== 1) {
+          throw new Error("ROUND_ONE_NOT_ENDED");
+        }
+        await transaction.team.update({
+          where: { id: params.data.id },
+          data: { qualifiedForRoundTwo: parsed.data.qualified },
+        });
+      });
+      const team = await loadAdminTeam(params.data.id);
+      if (!team) {
+        res.status(404).json({ error: "Team not found." });
+        return;
+      }
+      emitToAdmins("admin:team:update", team);
+      const [overview, teams] = await Promise.all([
+        loadAdminOverview(),
+        loadAdminTeams(),
+      ]);
+      emitToAdmins("admin:snapshot", { overview, teams });
+      res.json(UpdateRoundTwoQualificationResponse.parse(team));
+    } catch (error) {
+      if (error instanceof Error && error.message === "ROUND_ONE_NOT_ENDED") {
+        res.status(409).json({ error: "Round 2 team selection is available after Round 1 ends." });
+        return;
+      }
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+        res.status(404).json({ error: "Team not found." });
+        return;
+      }
+      req.log.error({ err: error }, "Unable to update Round 2 selection");
+      res.status(500).json({ error: "Could not update Round 2 selection." });
+    }
+  },
+);
+
+router.post("/admin/event/round-two/start", async (req, res): Promise<void> => {
+  try {
+    const event = await startRoundTwo();
+    await publishEventStatus();
+    const [overview, teams] = await Promise.all([
+      loadAdminOverview(),
+      loadAdminTeams(),
+    ]);
+    emitToAdmins("admin:snapshot", { overview, teams });
+    res.json(StartRoundTwoResponse.parse({ status: event.status }));
+  } catch (error) {
+    if (error instanceof Error) {
+      const expectedConflicts = [
+        "End Round 1 before opening Round 2.",
+        "Select at least one Round 2 team in the team manager first.",
+        "Select exactly two active final stops and at least one active POI before starting a round.",
+      ];
+      if (expectedConflicts.includes(error.message)) {
+        res.status(409).json({ error: error.message });
+        return;
+      }
+    }
+    req.log.error({ err: error }, "Unable to start Round 2");
+    res.status(500).json({ error: "Could not start Round 2." });
+  }
+});
+
 router.get("/admin/export.csv", async (_req, res): Promise<void> => {
+  const { currentRound } = await getEventState();
   const teams = await prisma.team.findMany({
     orderBy: [{ currentIndex: "desc" }, { finishedAt: "asc" }],
     include: {
       routes: { include: { checkpoint: true }, orderBy: { orderIndex: "asc" } },
       completions: { include: { checkpoint: true }, orderBy: { completedAt: "asc" } },
+      rounds: { orderBy: { round: "asc" } },
     },
   });
   const lines = [
-    ["Team", "Members", "Status", "Progress", "Started at", "Finished at", "Current checkpoint", "Completion log", "Suspicious"].map(csvCell).join(","),
+    ["Team", "Members", "Current round", "Round 2 selected", "Status", "Progress", "Started at", "Finished at", "Current checkpoint", "Routes by round", "Completion log", "Round times", "Suspicious"].map(csvCell).join(","),
     ...teams.map((team) => {
-      const current = team.routes.find((route) => route.orderIndex === team.currentIndex);
+      const currentRoutes = team.routes.filter((route) => route.round === currentRound);
+      const current = currentRoutes.find((route) => route.orderIndex === team.currentIndex);
+      const roundTimes = team.rounds
+        .map((round) => `R${round.round}: started ${round.startedAt?.toISOString() ?? "not started"}, finished ${round.finishedAt?.toISOString() ?? "not finished"}`)
+        .join("; ");
+      const routesByRound = [1, 2]
+        .map((round) => {
+          const route = team.routes
+            .filter((entry) => entry.round === round)
+            .sort((a, b) => a.orderIndex - b.orderIndex)
+            .map((entry) => entry.checkpoint.name);
+          return route.length ? `R${round}: ${route.join(" → ")}` : "";
+        })
+        .filter(Boolean)
+        .join("; ");
       const completionLog = team.completions
-        .map((item) => `${item.checkpoint.name} @ ${item.completedAt.toISOString()}`)
+        .map((item) => `R${item.round}: ${item.checkpoint.name} @ ${item.completedAt.toISOString()}`)
         .join("; ");
       return [
         team.name,
         team.members,
+        currentRound,
+        team.qualifiedForRoundTwo ? "YES" : "NO",
         team.status,
-        `${team.currentIndex}/${team.routes.length}`,
-        team.startedAt?.toISOString() ?? "",
-        team.finishedAt?.toISOString() ?? "",
+        `${team.currentIndex}/${currentRoutes.length}`,
+        team.rounds.find((round) => round.round === currentRound)?.startedAt?.toISOString() ?? "",
+        team.rounds.find((round) => round.round === currentRound)?.finishedAt?.toISOString() ?? "",
         current?.checkpoint.name ?? "",
+        routesByRound,
         completionLog,
+        roundTimes,
         team.suspicious ? "YES" : "NO",
       ].map(csvCell).join(",");
     }),

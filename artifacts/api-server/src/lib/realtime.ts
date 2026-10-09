@@ -3,7 +3,7 @@ import {
   loadAdminOverview,
   loadAdminTeam,
   getTeamGameState,
-  getEventStatus,
+  getEventState,
 } from "./game-service";
 
 let io: Server | null = null;
@@ -54,12 +54,15 @@ export async function publishTeamTarget(teamId: string) {
       completions: state.completions,
     });
   }
-  emitToTeam(teamId, "event:status", { status: state.eventStatus });
+  emitToTeam(teamId, "event:status", {
+    status: state.eventStatus,
+    currentRound: state.currentRound,
+  });
 }
 
 export async function publishEventStatus() {
-  const status = await getEventStatus();
-  io?.emit("event:status", { status });
+  const { status, currentRound } = await getEventState();
+  io?.emit("event:status", { status, currentRound });
   emitToAdmins("admin:snapshot", {
     overview: await loadAdminOverview(),
   });
