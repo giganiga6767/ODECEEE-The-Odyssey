@@ -7,6 +7,7 @@
  */
 import type { AdminRouteEntry } from './adminRouteEntry';
 import type { Completion } from './completion';
+import type { TeamFlowState } from './teamFlowState';
 import type { TeamStatus } from './teamStatus';
 
 export interface AdminTeam {
@@ -32,6 +33,11 @@ export interface AdminTeam {
   totalCheckpoints: number;
   /** @nullable */
   currentCheckpoint: string | null;
+  flowState: TeamFlowState;
+  /** @nullable */
+  checkpointArrivedAt: Date | null;
+  /** @nullable */
+  lastAnswerCorrect: boolean | null;
   /** @nullable */
   lastLat: number | null;
   /** @nullable */

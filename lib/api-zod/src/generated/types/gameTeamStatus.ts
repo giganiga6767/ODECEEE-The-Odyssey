@@ -5,6 +5,7 @@
  * API for WATT A PLAY 3.0 campus treasure hunt
  * OpenAPI spec version: 1.0.0
  */
+import type { TeamFlowState } from './teamFlowState';
 import type { TeamStatus } from './teamStatus';
 
 export interface GameTeamStatus {
@@ -18,4 +19,7 @@ export interface GameTeamStatus {
   currentIndex: number;
   totalCheckpoints: number;
   qualifiedForRoundTwo: boolean;
+  flowState: TeamFlowState;
+  /** @nullable */
+  lastAnswerCorrect: boolean | null;
 }

@@ -103,7 +103,9 @@ export const StartVoyageResponse = zod.object({
   "finishedAt": zod.coerce.date().nullable(),
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
-  "qualifiedForRoundTwo": zod.boolean()
+  "qualifiedForRoundTwo": zod.boolean(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "lastAnswerCorrect": zod.boolean().nullable()
 }),zod.null()]),
   "currentCheckpoint": zod.union([zod.object({
   "id": zod.string(),
@@ -111,7 +113,10 @@ export const StartVoyageResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "hint": zod.string().nullable()
+  "hint": zod.string().nullable(),
+  "questionText": zod.string().nullable(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean()
 }),zod.null()]),
   "progress": zod.number().int(),
   "total": zod.number().int(),
@@ -122,7 +127,8 @@ export const StartVoyageResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 })
 
@@ -141,7 +147,9 @@ export const GetGameStateResponse = zod.object({
   "finishedAt": zod.coerce.date().nullable(),
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
-  "qualifiedForRoundTwo": zod.boolean()
+  "qualifiedForRoundTwo": zod.boolean(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "lastAnswerCorrect": zod.boolean().nullable()
 }),zod.null()]),
   "currentCheckpoint": zod.union([zod.object({
   "id": zod.string(),
@@ -149,7 +157,10 @@ export const GetGameStateResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "hint": zod.string().nullable()
+  "hint": zod.string().nullable(),
+  "questionText": zod.string().nullable(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean()
 }),zod.null()]),
   "progress": zod.number().int(),
   "total": zod.number().int(),
@@ -160,8 +171,61 @@ export const GetGameStateResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
+})
+
+
+/**
+ * @summary Get the participant leaderboard
+ */
+export const GetGameLeaderboardResponseItem = zod.object({
+  "rank": zod.number().int(),
+  "teamName": zod.string(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "progress": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "completedAt": zod.coerce.date().nullable()
+})
+export const GetGameLeaderboardResponse = zod.array(GetGameLeaderboardResponseItem)
+
+
+/**
+ * @summary Get checkpoint flow and code configuration
+ */
+export const GetHuntSetupResponse = zod.object({
+  "detourEnabled": zod.boolean(),
+  "detourCheckpointId": zod.string().nullable(),
+  "detourTriggerCheckpointId": zod.string().nullable(),
+  "finalUnlockCodeConfigured": zod.boolean(),
+  "detourUnlockCodeConfigured": zod.boolean()
+})
+
+
+/**
+ * @summary Configure the optional penalty checkpoint and shared unlock codes
+ */
+export const updateHuntSetupBodyFinalUnlockCodeMax = 64;
+
+export const updateHuntSetupBodyDetourUnlockCodeMax = 64;
+
+
+
+export const UpdateHuntSetupBody = zod.object({
+  "detourEnabled": zod.boolean().optional(),
+  "detourCheckpointId": zod.string().nullish(),
+  "detourTriggerCheckpointId": zod.string().nullish(),
+  "finalUnlockCode": zod.string().max(updateHuntSetupBodyFinalUnlockCodeMax).nullish(),
+  "detourUnlockCode": zod.string().max(updateHuntSetupBodyDetourUnlockCodeMax).nullish()
+})
+
+export const UpdateHuntSetupResponse = zod.object({
+  "detourEnabled": zod.boolean(),
+  "detourCheckpointId": zod.string().nullable(),
+  "detourTriggerCheckpointId": zod.string().nullable(),
+  "finalUnlockCodeConfigured": zod.boolean(),
+  "detourUnlockCodeConfigured": zod.boolean()
 })
 
 
@@ -177,6 +241,8 @@ export const GetCheckpointsResponseItem = zod.object({
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
   "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 export const GetCheckpointsResponse = zod.array(GetCheckpointsResponseItem)
@@ -198,6 +264,8 @@ export const createCheckpointBodyRadiusMMax = 200;
 
 export const createCheckpointBodyHintMax = 500;
 
+export const createCheckpointBodyQuestionTextMax = 2000;
+
 
 
 export const CreateCheckpointBody = zod.object({
@@ -206,7 +274,9 @@ export const CreateCheckpointBody = zod.object({
   "lng": zod.number().min(createCheckpointBodyLngMin).max(createCheckpointBodyLngMax),
   "radiusM": zod.number().min(createCheckpointBodyRadiusMMin).max(createCheckpointBodyRadiusMMax),
   "hint": zod.string().max(createCheckpointBodyHintMax).nullish(),
-  "isFinalStop": zod.boolean().optional()
+  "isFinalStop": zod.boolean().optional(),
+  "isDetour": zod.boolean().optional(),
+  "questionText": zod.string().max(createCheckpointBodyQuestionTextMax).nullish()
 })
 
 export const CreateCheckpointResponse = zod.object({
@@ -218,6 +288,8 @@ export const CreateCheckpointResponse = zod.object({
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
   "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 
@@ -242,6 +314,8 @@ export const updateCheckpointBodyRadiusMMax = 200;
 
 export const updateCheckpointBodyHintMax = 500;
 
+export const updateCheckpointBodyQuestionTextMax = 2000;
+
 
 
 export const UpdateCheckpointBody = zod.object({
@@ -250,7 +324,9 @@ export const UpdateCheckpointBody = zod.object({
   "lng": zod.number().min(updateCheckpointBodyLngMin).max(updateCheckpointBodyLngMax),
   "radiusM": zod.number().min(updateCheckpointBodyRadiusMMin).max(updateCheckpointBodyRadiusMMax),
   "hint": zod.string().max(updateCheckpointBodyHintMax).nullish(),
-  "isFinalStop": zod.boolean().optional()
+  "isFinalStop": zod.boolean().optional(),
+  "isDetour": zod.boolean().optional(),
+  "questionText": zod.string().max(updateCheckpointBodyQuestionTextMax).nullish()
 })
 
 export const UpdateCheckpointResponse = zod.object({
@@ -262,6 +338,8 @@ export const UpdateCheckpointResponse = zod.object({
   "hint": zod.string().nullable(),
   "isActive": zod.boolean(),
   "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable(),
   "createdAt": zod.coerce.date()
 })
 
@@ -296,6 +374,9 @@ export const GetTeamsResponseItem = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -311,7 +392,10 @@ export const GetTeamsResponseItem = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -320,7 +404,8 @@ export const GetTeamsResponseItem = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 })
 export const GetTeamsResponse = zod.array(GetTeamsResponseItem)
@@ -356,6 +441,9 @@ export const CreateTeamResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -371,7 +459,10 @@ export const CreateTeamResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -380,7 +471,8 @@ export const CreateTeamResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 }),
   "passcode": zod.string()
@@ -414,6 +506,9 @@ export const BulkCreateTeamsResponseItem = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -429,7 +524,10 @@ export const BulkCreateTeamsResponseItem = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -438,7 +536,8 @@ export const BulkCreateTeamsResponseItem = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 }),
   "passcode": zod.string()
@@ -479,6 +578,9 @@ export const UpdateTeamResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -494,7 +596,10 @@ export const UpdateTeamResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -503,7 +608,8 @@ export const UpdateTeamResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 })
 
@@ -517,6 +623,258 @@ export const DeleteTeamParams = zod.object({
 
 export const DeleteTeamResponse = zod.object({
   "ok": zod.boolean()
+})
+
+
+/**
+ * @summary Record a volunteer's answer decision
+ */
+export const MarkTeamAnswerParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const MarkTeamAnswerBody = zod.object({
+  "correct": zod.boolean()
+})
+
+export const MarkTeamAnswerResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "members": zod.string().nullable(),
+  "codeHint": zod.string(),
+  "leaderName": zod.string().nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "lastLoginAt": zod.coerce.date().nullable(),
+  "userAgent": zod.string().nullable(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "currentIndex": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
+  "lastLat": zod.number().nullable(),
+  "lastLng": zod.number().nullable(),
+  "lastAccuracy": zod.number().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
+  "completionCount": zod.number().int(),
+  "assignedRoute": zod.array(zod.object({
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "radiusM": zod.number(),
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
+})),
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "completedAt": zod.coerce.date(),
+  "distanceAtCaptureM": zod.number(),
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
+}))
+})
+
+
+/**
+ * @summary Confirm checkpoint 9 arrival and send the team back to its question stop
+ */
+export const ConfirmTeamAtDetourParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ConfirmTeamAtDetourResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "members": zod.string().nullable(),
+  "codeHint": zod.string(),
+  "leaderName": zod.string().nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "lastLoginAt": zod.coerce.date().nullable(),
+  "userAgent": zod.string().nullable(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "currentIndex": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
+  "lastLat": zod.number().nullable(),
+  "lastLng": zod.number().nullable(),
+  "lastAccuracy": zod.number().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
+  "completionCount": zod.number().int(),
+  "assignedRoute": zod.array(zod.object({
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "radiusM": zod.number(),
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
+})),
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "completedAt": zod.coerce.date(),
+  "distanceAtCaptureM": zod.number(),
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
+}))
+})
+
+
+/**
+ * @summary Validate the separate detour code and reveal the correct next stop
+ */
+export const ReleaseTeamFromDetourParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const releaseTeamFromDetourBodyCodeMax = 64;
+
+
+
+export const ReleaseTeamFromDetourBody = zod.object({
+  "code": zod.string().min(1).max(releaseTeamFromDetourBodyCodeMax)
+})
+
+export const ReleaseTeamFromDetourResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "members": zod.string().nullable(),
+  "codeHint": zod.string(),
+  "leaderName": zod.string().nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "lastLoginAt": zod.coerce.date().nullable(),
+  "userAgent": zod.string().nullable(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "currentIndex": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
+  "lastLat": zod.number().nullable(),
+  "lastLng": zod.number().nullable(),
+  "lastAccuracy": zod.number().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
+  "completionCount": zod.number().int(),
+  "assignedRoute": zod.array(zod.object({
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "radiusM": zod.number(),
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
+})),
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "completedAt": zod.coerce.date(),
+  "distanceAtCaptureM": zod.number(),
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
+}))
+})
+
+
+/**
+ * @summary Validate the shared final-stop code and advance the team
+ */
+export const UnlockTeamFinalParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const unlockTeamFinalBodyCodeMax = 64;
+
+
+
+export const UnlockTeamFinalBody = zod.object({
+  "code": zod.string().min(1).max(unlockTeamFinalBodyCodeMax)
+})
+
+export const UnlockTeamFinalResponse = zod.object({
+  "id": zod.string(),
+  "name": zod.string(),
+  "members": zod.string().nullable(),
+  "codeHint": zod.string(),
+  "leaderName": zod.string().nullable(),
+  "claimedAt": zod.coerce.date().nullable(),
+  "lastLoginAt": zod.coerce.date().nullable(),
+  "userAgent": zod.string().nullable(),
+  "status": zod.enum(['NOT_STARTED', 'ACTIVE', 'FINISHED']),
+  "startedAt": zod.coerce.date().nullable(),
+  "finishedAt": zod.coerce.date().nullable(),
+  "currentIndex": zod.number().int(),
+  "totalCheckpoints": zod.number().int(),
+  "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
+  "lastLat": zod.number().nullable(),
+  "lastLng": zod.number().nullable(),
+  "lastAccuracy": zod.number().nullable(),
+  "lastSeenAt": zod.coerce.date().nullable(),
+  "suspicious": zod.boolean(),
+  "qualifiedForRoundTwo": zod.boolean(),
+  "completionCount": zod.number().int(),
+  "assignedRoute": zod.array(zod.object({
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "orderIndex": zod.number().int(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "lat": zod.number(),
+  "lng": zod.number(),
+  "radiusM": zod.number(),
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
+})),
+  "completions": zod.array(zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "checkpointName": zod.string(),
+  "completedAt": zod.coerce.date(),
+  "distanceAtCaptureM": zod.number(),
+  "accuracyM": zod.number(),
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
+}))
 })
 
 
@@ -543,6 +901,9 @@ export const ResetTeamResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -558,7 +919,10 @@ export const ResetTeamResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -567,7 +931,8 @@ export const ResetTeamResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 }),
   "passcode": zod.string()
@@ -609,6 +974,9 @@ export const RegenerateTeamCodeResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -624,7 +992,10 @@ export const RegenerateTeamCodeResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -633,7 +1004,8 @@ export const RegenerateTeamCodeResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 }),
   "passcode": zod.string()
@@ -666,6 +1038,9 @@ export const UpdateRoundTwoQualificationResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -681,7 +1056,10 @@ export const UpdateRoundTwoQualificationResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -690,7 +1068,8 @@ export const UpdateRoundTwoQualificationResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 })
 
@@ -730,6 +1109,9 @@ export const GetAdminOverviewResponse = zod.object({
   "currentIndex": zod.number().int(),
   "totalCheckpoints": zod.number().int(),
   "currentCheckpoint": zod.string().nullable(),
+  "flowState": zod.enum(['EN_ROUTE', 'AWAITING_ANSWER', 'DETOUR_EN_ROUTE', 'AWAITING_DETOUR_CODE', 'AWAITING_FINAL_CODE']),
+  "checkpointArrivedAt": zod.coerce.date().nullable(),
+  "lastAnswerCorrect": zod.boolean().nullable(),
   "lastLat": zod.number().nullable(),
   "lastLng": zod.number().nullable(),
   "lastAccuracy": zod.number().nullable(),
@@ -745,7 +1127,10 @@ export const GetAdminOverviewResponse = zod.object({
   "lat": zod.number(),
   "lng": zod.number(),
   "radiusM": zod.number(),
-  "isActive": zod.boolean()
+  "isActive": zod.boolean(),
+  "isFinalStop": zod.boolean(),
+  "isDetour": zod.boolean(),
+  "questionText": zod.string().nullable()
 })),
   "completions": zod.array(zod.object({
   "id": zod.string(),
@@ -754,7 +1139,8 @@ export const GetAdminOverviewResponse = zod.object({
   "completedAt": zod.coerce.date(),
   "distanceAtCaptureM": zod.number(),
   "accuracyM": zod.number(),
-  "round": zod.union([zod.literal(1),zod.literal(2)])
+  "round": zod.union([zod.literal(1),zod.literal(2)]),
+  "verificationMethod": zod.enum(['GPS', 'VOLUNTEER', 'ADMIN_CODE'])
 }))
 })),
   "recentCompletions": zod.array(zod.object({

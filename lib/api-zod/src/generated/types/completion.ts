@@ -6,6 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import type { CompletionRound } from './completionRound';
+import type { CompletionVerificationMethod } from './completionVerificationMethod';
 
 export interface Completion {
   id: string;
@@ -15,4 +16,5 @@ export interface Completion {
   distanceAtCaptureM: number;
   accuracyM: number;
   round: CompletionRound;
+  verificationMethod: CompletionVerificationMethod;
 }

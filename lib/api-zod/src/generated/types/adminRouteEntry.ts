@@ -16,4 +16,8 @@ export interface AdminRouteEntry {
   lng: number;
   radiusM: number;
   isActive: boolean;
+  isFinalStop: boolean;
+  isDetour: boolean;
+  /** @nullable */
+  questionText: string | null;
 }

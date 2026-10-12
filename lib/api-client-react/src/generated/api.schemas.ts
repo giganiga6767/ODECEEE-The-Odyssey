@@ -94,6 +94,9 @@ export interface Checkpoint {
   hint: string | null;
   isActive: boolean;
   isFinalStop: boolean;
+  isDetour: boolean;
+  /** @nullable */
+  questionText: string | null;
   createdAt: string;
 }
 
@@ -124,6 +127,12 @@ export interface CheckpointInput {
      */
   hint?: string | null;
   isFinalStop?: boolean;
+  isDetour?: boolean;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  questionText?: string | null;
 }
 
 export interface TeamInput {
@@ -173,6 +182,17 @@ export const TeamStatus = {
   FINISHED: 'FINISHED',
 } as const;
 
+export type TeamFlowState = typeof TeamFlowState[keyof typeof TeamFlowState];
+
+
+export const TeamFlowState = {
+  EN_ROUTE: 'EN_ROUTE',
+  AWAITING_ANSWER: 'AWAITING_ANSWER',
+  DETOUR_EN_ROUTE: 'DETOUR_EN_ROUTE',
+  AWAITING_DETOUR_CODE: 'AWAITING_DETOUR_CODE',
+  AWAITING_FINAL_CODE: 'AWAITING_FINAL_CODE',
+} as const;
+
 export type AdminRouteEntryRound = typeof AdminRouteEntryRound[keyof typeof AdminRouteEntryRound];
 
 
@@ -190,6 +210,10 @@ export interface AdminRouteEntry {
   lng: number;
   radiusM: number;
   isActive: boolean;
+  isFinalStop: boolean;
+  isDetour: boolean;
+  /** @nullable */
+  questionText: string | null;
 }
 
 export type CompletionRound = typeof CompletionRound[keyof typeof CompletionRound];
@@ -200,6 +224,15 @@ export const CompletionRound = {
   NUMBER_2: 2,
 } as const;
 
+export type CompletionVerificationMethod = typeof CompletionVerificationMethod[keyof typeof CompletionVerificationMethod];
+
+
+export const CompletionVerificationMethod = {
+  GPS: 'GPS',
+  VOLUNTEER: 'VOLUNTEER',
+  ADMIN_CODE: 'ADMIN_CODE',
+} as const;
+
 export interface Completion {
   id: string;
   checkpointId: string;
@@ -208,6 +241,7 @@ export interface Completion {
   distanceAtCaptureM: number;
   accuracyM: number;
   round: CompletionRound;
+  verificationMethod: CompletionVerificationMethod;
 }
 
 export interface AdminTeam {
@@ -233,6 +267,11 @@ export interface AdminTeam {
   totalCheckpoints: number;
   /** @nullable */
   currentCheckpoint: string | null;
+  flowState: TeamFlowState;
+  /** @nullable */
+  checkpointArrivedAt: string | null;
+  /** @nullable */
+  lastAnswerCorrect: boolean | null;
   /** @nullable */
   lastLat: number | null;
   /** @nullable */
@@ -261,6 +300,10 @@ export interface GameCheckpoint {
   radiusM: number;
   /** @nullable */
   hint: string | null;
+  /** @nullable */
+  questionText: string | null;
+  isFinalStop: boolean;
+  isDetour: boolean;
 }
 
 export type GameStateEventStatus = typeof GameStateEventStatus[keyof typeof GameStateEventStatus];
@@ -292,6 +335,9 @@ export interface GameTeamStatus {
   currentIndex: number;
   totalCheckpoints: number;
   qualifiedForRoundTwo: boolean;
+  flowState: TeamFlowState;
+  /** @nullable */
+  lastAnswerCorrect: boolean | null;
 }
 
 export interface GameState {
@@ -302,6 +348,58 @@ export interface GameState {
   progress: number;
   total: number;
   completions: Completion[];
+}
+
+export interface GameLeaderboardEntry {
+  rank: number;
+  teamName: string;
+  status: TeamStatus;
+  progress: number;
+  totalCheckpoints: number;
+  /** @nullable */
+  completedAt: string | null;
+}
+
+export type GameLeaderboardResponse = GameLeaderboardEntry[];
+
+export interface HuntSetup {
+  detourEnabled: boolean;
+  /** @nullable */
+  detourCheckpointId: string | null;
+  /** @nullable */
+  detourTriggerCheckpointId: string | null;
+  finalUnlockCodeConfigured: boolean;
+  detourUnlockCodeConfigured: boolean;
+}
+
+export interface HuntSetupUpdate {
+  detourEnabled?: boolean;
+  /** @nullable */
+  detourCheckpointId?: string | null;
+  /** @nullable */
+  detourTriggerCheckpointId?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  finalUnlockCode?: string | null;
+  /**
+     * @maxLength 64
+     * @nullable
+     */
+  detourUnlockCode?: string | null;
+}
+
+export interface TeamAnswerInput {
+  correct: boolean;
+}
+
+export interface TeamSharedCodeInput {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     */
+  code: string;
 }
 
 export interface GameSettings {

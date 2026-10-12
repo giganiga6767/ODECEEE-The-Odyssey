@@ -33,4 +33,10 @@ export interface CheckpointInput {
      */
   hint?: string | null;
   isFinalStop?: boolean;
+  isDetour?: boolean;
+  /**
+     * @maxLength 2000
+     * @nullable
+     */
+  questionText?: string | null;
 }

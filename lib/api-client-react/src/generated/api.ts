@@ -28,15 +28,20 @@ import type {
   Checkpoint,
   CheckpointInput,
   EventStatusResponse,
+  GameLeaderboardResponse,
   GameSettings,
   GameSettingsInput,
   GameState,
   HealthStatus,
+  HuntSetup,
+  HuntSetupUpdate,
   OkResponse,
   ProvisionedTeam,
   RoundTwoQualificationInput,
+  TeamAnswerInput,
   TeamInput,
   TeamLoginInput,
+  TeamSharedCodeInput,
   TeamUpdateInput,
   VolunteerAccount,
   VolunteerAccountInput,
@@ -625,6 +630,248 @@ export function useGetGameState<TData = Awaited<ReturnType<typeof getGameState>>
 
 
 
+
+export const getGetGameLeaderboardUrl = () => {
+
+
+
+
+  return `/api/game/leaderboard`
+}
+
+/**
+ * @summary Get the participant leaderboard
+ */
+export const getGameLeaderboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<GameLeaderboardResponse> => {
+
+  return customFetch<GameLeaderboardResponse>(getGetGameLeaderboardUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetGameLeaderboardQueryKey = () => {
+    return [
+    `/api/game/leaderboard`
+    ] as const;
+    }
+
+
+export const getGetGameLeaderboardQueryOptions = <TData = Awaited<ReturnType<typeof getGameLeaderboard>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGameLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetGameLeaderboardQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getGameLeaderboard>>> = ({ signal }) => getGameLeaderboard({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getGameLeaderboard>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetGameLeaderboardQueryResult = NonNullable<Awaited<ReturnType<typeof getGameLeaderboard>>>
+export type GetGameLeaderboardQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the participant leaderboard
+ */
+
+export function useGetGameLeaderboard<TData = Awaited<ReturnType<typeof getGameLeaderboard>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getGameLeaderboard>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetGameLeaderboardQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetHuntSetupUrl = () => {
+
+
+
+
+  return `/api/admin/hunt-setup`
+}
+
+/**
+ * @summary Get checkpoint flow and code configuration
+ */
+export const getHuntSetup = async ( options?: Parameters<typeof customFetch>[1]): Promise<HuntSetup> => {
+
+  return customFetch<HuntSetup>(getGetHuntSetupUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetHuntSetupQueryKey = () => {
+    return [
+    `/api/admin/hunt-setup`
+    ] as const;
+    }
+
+
+export const getGetHuntSetupQueryOptions = <TData = Awaited<ReturnType<typeof getHuntSetup>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHuntSetup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetHuntSetupQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getHuntSetup>>> = ({ signal }) => getHuntSetup({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getHuntSetup>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetHuntSetupQueryResult = NonNullable<Awaited<ReturnType<typeof getHuntSetup>>>
+export type GetHuntSetupQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get checkpoint flow and code configuration
+ */
+
+export function useGetHuntSetup<TData = Awaited<ReturnType<typeof getHuntSetup>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getHuntSetup>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetHuntSetupQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateHuntSetupUrl = () => {
+
+
+
+
+  return `/api/admin/hunt-setup`
+}
+
+/**
+ * @summary Configure the optional penalty checkpoint and shared unlock codes
+ */
+export const updateHuntSetup = async (huntSetupUpdate: HuntSetupUpdate, options?: Parameters<typeof customFetch>[1]): Promise<HuntSetup> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<HuntSetup>(getUpdateHuntSetupUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(huntSetupUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateHuntSetupMutationKey = () => ['updateHuntSetup'] as const;
+
+export const getUpdateHuntSetupMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHuntSetup>>, TError,UpdateHuntSetupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateHuntSetup>>, TError,UpdateHuntSetupMutationVariables, TContext> => {
+
+const mutationKey = getUpdateHuntSetupMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateHuntSetup>>, UpdateHuntSetupMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateHuntSetup(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateHuntSetupMutationResult = NonNullable<Awaited<ReturnType<typeof updateHuntSetup>>>
+    export type UpdateHuntSetupMutationBody = BodyType<HuntSetupUpdate>
+    export type UpdateHuntSetupMutationError = ErrorType<void>
+    export type UpdateHuntSetupMutationVariables = {data: BodyType<HuntSetupUpdate>}
+
+    /**
+ * @summary Configure the optional penalty checkpoint and shared unlock codes
+ */
+export const useUpdateHuntSetup = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateHuntSetup>>, TError,UpdateHuntSetupMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateHuntSetup>>,
+        TError,
+        UpdateHuntSetupMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUpdateHuntSetupMutationOptions(options));
+    }
 
 export const getGetCheckpointsUrl = () => {
 
@@ -1368,6 +1615,347 @@ export const useDeleteTeam = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeleteTeamMutationOptions(options));
+    }
+
+export const getMarkTeamAnswerUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/teams/${id}/answer`
+}
+
+/**
+ * @summary Record a volunteer's answer decision
+ */
+export const markTeamAnswer = async (id: string,
+    teamAnswerInput: TeamAnswerInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminTeam>(getMarkTeamAnswerUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teamAnswerInput)
+  }
+);}
+
+
+
+
+
+export const getMarkTeamAnswerMutationKey = () => ['markTeamAnswer'] as const;
+
+export const getMarkTeamAnswerMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeamAnswer>>, TError,MarkTeamAnswerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof markTeamAnswer>>, TError,MarkTeamAnswerMutationVariables, TContext> => {
+
+const mutationKey = getMarkTeamAnswerMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof markTeamAnswer>>, MarkTeamAnswerMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  markTeamAnswer(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type MarkTeamAnswerMutationResult = NonNullable<Awaited<ReturnType<typeof markTeamAnswer>>>
+    export type MarkTeamAnswerMutationBody = BodyType<TeamAnswerInput>
+    export type MarkTeamAnswerMutationError = ErrorType<void>
+    export type MarkTeamAnswerMutationVariables = {id: string;data: BodyType<TeamAnswerInput>}
+
+    /**
+ * @summary Record a volunteer's answer decision
+ */
+export const useMarkTeamAnswer = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof markTeamAnswer>>, TError,MarkTeamAnswerMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof markTeamAnswer>>,
+        TError,
+        MarkTeamAnswerMutationVariables,
+        TContext
+      > => {
+      return useMutation(getMarkTeamAnswerMutationOptions(options));
+    }
+
+export const getConfirmTeamAtDetourUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/teams/${id}/confirm-detour`
+}
+
+/**
+ * @summary Confirm checkpoint 9 arrival and send the team back to its question stop
+ */
+export const confirmTeamAtDetour = async (id: string, options?: Parameters<typeof customFetch>[1]): Promise<AdminTeam> => {
+
+  return customFetch<AdminTeam>(getConfirmTeamAtDetourUrl(id),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+
+export const getConfirmTeamAtDetourMutationKey = () => ['confirmTeamAtDetour'] as const;
+
+export const getConfirmTeamAtDetourMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmTeamAtDetour>>, TError,ConfirmTeamAtDetourMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof confirmTeamAtDetour>>, TError,ConfirmTeamAtDetourMutationVariables, TContext> => {
+
+const mutationKey = getConfirmTeamAtDetourMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmTeamAtDetour>>, ConfirmTeamAtDetourMutationVariables> = (props) => {
+          const {id} = props ?? {};
+
+          return  confirmTeamAtDetour(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ConfirmTeamAtDetourMutationResult = NonNullable<Awaited<ReturnType<typeof confirmTeamAtDetour>>>
+
+    export type ConfirmTeamAtDetourMutationError = ErrorType<void>
+    export type ConfirmTeamAtDetourMutationVariables = {id: string}
+
+    /**
+ * @summary Confirm checkpoint 9 arrival and send the team back to its question stop
+ */
+export const useConfirmTeamAtDetour = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof confirmTeamAtDetour>>, TError,ConfirmTeamAtDetourMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof confirmTeamAtDetour>>,
+        TError,
+        ConfirmTeamAtDetourMutationVariables,
+        TContext
+      > => {
+      return useMutation(getConfirmTeamAtDetourMutationOptions(options));
+    }
+
+export const getReleaseTeamFromDetourUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/teams/${id}/release-detour`
+}
+
+/**
+ * @summary Validate the separate detour code and reveal the correct next stop
+ */
+export const releaseTeamFromDetour = async (id: string,
+    teamSharedCodeInput: TeamSharedCodeInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminTeam>(getReleaseTeamFromDetourUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teamSharedCodeInput)
+  }
+);}
+
+
+
+
+
+export const getReleaseTeamFromDetourMutationKey = () => ['releaseTeamFromDetour'] as const;
+
+export const getReleaseTeamFromDetourMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseTeamFromDetour>>, TError,ReleaseTeamFromDetourMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof releaseTeamFromDetour>>, TError,ReleaseTeamFromDetourMutationVariables, TContext> => {
+
+const mutationKey = getReleaseTeamFromDetourMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof releaseTeamFromDetour>>, ReleaseTeamFromDetourMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  releaseTeamFromDetour(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReleaseTeamFromDetourMutationResult = NonNullable<Awaited<ReturnType<typeof releaseTeamFromDetour>>>
+    export type ReleaseTeamFromDetourMutationBody = BodyType<TeamSharedCodeInput>
+    export type ReleaseTeamFromDetourMutationError = ErrorType<void>
+    export type ReleaseTeamFromDetourMutationVariables = {id: string;data: BodyType<TeamSharedCodeInput>}
+
+    /**
+ * @summary Validate the separate detour code and reveal the correct next stop
+ */
+export const useReleaseTeamFromDetour = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof releaseTeamFromDetour>>, TError,ReleaseTeamFromDetourMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof releaseTeamFromDetour>>,
+        TError,
+        ReleaseTeamFromDetourMutationVariables,
+        TContext
+      > => {
+      return useMutation(getReleaseTeamFromDetourMutationOptions(options));
+    }
+
+export const getUnlockTeamFinalUrl = (id: string,) => {
+
+
+
+
+  return `/api/admin/teams/${id}/unlock-final`
+}
+
+/**
+ * @summary Validate the shared final-stop code and advance the team
+ */
+export const unlockTeamFinal = async (id: string,
+    teamSharedCodeInput: TeamSharedCodeInput, options?: Parameters<typeof customFetch>[1]): Promise<AdminTeam> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<AdminTeam>(getUnlockTeamFinalUrl(id),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(teamSharedCodeInput)
+  }
+);}
+
+
+
+
+
+export const getUnlockTeamFinalMutationKey = () => ['unlockTeamFinal'] as const;
+
+export const getUnlockTeamFinalMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTeamFinal>>, TError,UnlockTeamFinalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof unlockTeamFinal>>, TError,UnlockTeamFinalMutationVariables, TContext> => {
+
+const mutationKey = getUnlockTeamFinalMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof unlockTeamFinal>>, UnlockTeamFinalMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  unlockTeamFinal(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UnlockTeamFinalMutationResult = NonNullable<Awaited<ReturnType<typeof unlockTeamFinal>>>
+    export type UnlockTeamFinalMutationBody = BodyType<TeamSharedCodeInput>
+    export type UnlockTeamFinalMutationError = ErrorType<void>
+    export type UnlockTeamFinalMutationVariables = {id: string;data: BodyType<TeamSharedCodeInput>}
+
+    /**
+ * @summary Validate the shared final-stop code and advance the team
+ */
+export const useUnlockTeamFinal = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof unlockTeamFinal>>, TError,UnlockTeamFinalMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof unlockTeamFinal>>,
+        TError,
+        UnlockTeamFinalMutationVariables,
+        TContext
+      > => {
+      return useMutation(getUnlockTeamFinalMutationOptions(options));
     }
 
 export const getResetTeamUrl = (id: string,) => {

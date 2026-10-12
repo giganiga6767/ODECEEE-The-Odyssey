@@ -122,6 +122,49 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GameState"
+  /game/leaderboard:
+    get:
+      operationId: getGameLeaderboard
+      tags: [game]
+      summary: Get the participant leaderboard
+      responses:
+        "200":
+          description: Team standings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GameLeaderboardResponse"
+  /admin/hunt-setup:
+    get:
+      operationId: getHuntSetup
+      tags: [admin]
+      summary: Get checkpoint flow and code configuration
+      responses:
+        "200":
+          description: Hunt setup; unlock codes are never returned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HuntSetup"
+    patch:
+      operationId: updateHuntSetup
+      tags: [admin]
+      summary: Configure the optional penalty checkpoint and shared unlock codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HuntSetupUpdate"
+      responses:
+        "200":
+          description: Updated hunt setup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HuntSetup"
+        "409":
+          description: Setup cannot be changed while the hunt is open
   /admin/checkpoints:
     get:
       operationId: getCheckpoints
@@ -286,6 +329,104 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/OkResponse"
+  /admin/teams/{id}/answer:
+    post:
+      operationId: markTeamAnswer
+      tags: [admin]
+      summary: Record a volunteer's answer decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamAnswerInput"
+      responses:
+        "200":
+          description: Updated team progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+        "409":
+          description: Team is not waiting for an answer
+  /admin/teams/{id}/confirm-detour:
+    post:
+      operationId: confirmTeamAtDetour
+      tags: [admin]
+      summary: Confirm checkpoint 9 arrival and send the team back to its question stop
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Updated team progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+        "409":
+          description: Team is not en route to the detour
+  /admin/teams/{id}/release-detour:
+    post:
+      operationId: releaseTeamFromDetour
+      tags: [admin]
+      summary: Validate the separate detour code and reveal the correct next stop
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamSharedCodeInput"
+      responses:
+        "200":
+          description: Updated team progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+        "409":
+          description: Incorrect code or team is not waiting for the detour code
+  /admin/teams/{id}/unlock-final:
+    post:
+      operationId: unlockTeamFinal
+      tags: [admin]
+      summary: Validate the shared final-stop code and advance the team
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TeamSharedCodeInput"
+      responses:
+        "200":
+          description: Updated team progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminTeam"
+        "409":
+          description: Incorrect code or team is not waiting at a final stop
   /admin/teams/{id}/reset:
     post:
       operationId: resetTeam
@@ -606,8 +747,10 @@ components:
         hint: { type: ["string", "null"] }
         isActive: { type: boolean }
         isFinalStop: { type: boolean }
+        isDetour: { type: boolean }
+        questionText: { type: ["string", "null"] }
         createdAt: { type: string, format: date-time }
-      required: [id, name, lat, lng, radiusM, hint, isActive, isFinalStop, createdAt]
+      required: [id, name, lat, lng, radiusM, hint, isActive, isFinalStop, isDetour, questionText, createdAt]
     CheckpointInput:
       type: object
       properties:
@@ -617,6 +760,8 @@ components:
         radiusM: { type: number, minimum: 5, maximum: 200 }
         hint: { type: ["string", "null"], maxLength: 500 }
         isFinalStop: { type: boolean }
+        isDetour: { type: boolean }
+        questionText: { type: ["string", "null"], maxLength: 2000 }
       required: [name, lat, lng, radiusM]
     TeamInput:
       type: object
@@ -642,6 +787,9 @@ components:
     TeamStatus:
       type: string
       enum: [NOT_STARTED, ACTIVE, FINISHED]
+    TeamFlowState:
+      type: string
+      enum: [EN_ROUTE, AWAITING_ANSWER, DETOUR_EN_ROUTE, AWAITING_DETOUR_CODE, AWAITING_FINAL_CODE]
     AdminTeam:
       type: object
       properties:
@@ -659,6 +807,9 @@ components:
         currentIndex: { type: integer }
         totalCheckpoints: { type: integer }
         currentCheckpoint: { type: ["string", "null"] }
+        flowState: { $ref: "#/components/schemas/TeamFlowState" }
+        checkpointArrivedAt: { type: ["string", "null"], format: date-time }
+        lastAnswerCorrect: { type: ["boolean", "null"] }
         lastLat: { type: ["number", "null"] }
         lastLng: { type: ["number", "null"] }
         lastAccuracy: { type: ["number", "null"] }
@@ -672,7 +823,7 @@ components:
         completions:
           type: array
           items: { $ref: "#/components/schemas/Completion" }
-      required: [id, name, members, codeHint, leaderName, claimedAt, lastLoginAt, userAgent, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, qualifiedForRoundTwo, completionCount, assignedRoute, completions]
+      required: [id, name, members, codeHint, leaderName, claimedAt, lastLoginAt, userAgent, status, startedAt, finishedAt, currentIndex, totalCheckpoints, currentCheckpoint, flowState, checkpointArrivedAt, lastAnswerCorrect, lastLat, lastLng, lastAccuracy, lastSeenAt, suspicious, qualifiedForRoundTwo, completionCount, assignedRoute, completions]
     AdminRouteEntry:
       type: object
       properties:
@@ -684,7 +835,10 @@ components:
         lng: { type: number }
         radiusM: { type: number }
         isActive: { type: boolean }
-      required: [checkpointId, checkpointName, orderIndex, round, lat, lng, radiusM, isActive]
+        isFinalStop: { type: boolean }
+        isDetour: { type: boolean }
+        questionText: { type: ["string", "null"] }
+      required: [checkpointId, checkpointName, orderIndex, round, lat, lng, radiusM, isActive, isFinalStop, isDetour, questionText]
     ProvisionedTeam:
       type: object
       properties:
@@ -701,7 +855,8 @@ components:
         distanceAtCaptureM: { type: number }
         accuracyM: { type: number }
         round: { type: integer, enum: [1, 2] }
-      required: [id, checkpointId, checkpointName, completedAt, distanceAtCaptureM, accuracyM, round]
+        verificationMethod: { type: string, enum: [GPS, VOLUNTEER, ADMIN_CODE] }
+      required: [id, checkpointId, checkpointName, completedAt, distanceAtCaptureM, accuracyM, round, verificationMethod]
     GameCheckpoint:
       type: object
       properties:
@@ -711,7 +866,10 @@ components:
         lng: { type: number }
         radiusM: { type: number }
         hint: { type: ["string", "null"] }
-      required: [id, name, lat, lng, radiusM, hint]
+        questionText: { type: ["string", "null"] }
+        isFinalStop: { type: boolean }
+        isDetour: { type: boolean }
+      required: [id, name, lat, lng, radiusM, hint, questionText, isFinalStop, isDetour]
     GameState:
       type: object
       properties:
@@ -742,7 +900,49 @@ components:
         currentIndex: { type: integer }
         totalCheckpoints: { type: integer }
         qualifiedForRoundTwo: { type: boolean }
-      required: [id, name, status, startedAt, finishedAt, currentIndex, totalCheckpoints, qualifiedForRoundTwo]
+        flowState: { $ref: "#/components/schemas/TeamFlowState" }
+        lastAnswerCorrect: { type: ["boolean", "null"] }
+      required: [id, name, status, startedAt, finishedAt, currentIndex, totalCheckpoints, qualifiedForRoundTwo, flowState, lastAnswerCorrect]
+    GameLeaderboardEntry:
+      type: object
+      properties:
+        rank: { type: integer }
+        teamName: { type: string }
+        status: { $ref: "#/components/schemas/TeamStatus" }
+        progress: { type: integer }
+        totalCheckpoints: { type: integer }
+        completedAt: { type: ["string", "null"], format: date-time }
+      required: [rank, teamName, status, progress, totalCheckpoints, completedAt]
+    GameLeaderboardResponse:
+      type: array
+      items: { $ref: "#/components/schemas/GameLeaderboardEntry" }
+    HuntSetup:
+      type: object
+      properties:
+        detourEnabled: { type: boolean }
+        detourCheckpointId: { type: ["string", "null"] }
+        detourTriggerCheckpointId: { type: ["string", "null"] }
+        finalUnlockCodeConfigured: { type: boolean }
+        detourUnlockCodeConfigured: { type: boolean }
+      required: [detourEnabled, detourCheckpointId, detourTriggerCheckpointId, finalUnlockCodeConfigured, detourUnlockCodeConfigured]
+    HuntSetupUpdate:
+      type: object
+      properties:
+        detourEnabled: { type: boolean }
+        detourCheckpointId: { type: ["string", "null"] }
+        detourTriggerCheckpointId: { type: ["string", "null"] }
+        finalUnlockCode: { type: ["string", "null"], maxLength: 64 }
+        detourUnlockCode: { type: ["string", "null"], maxLength: 64 }
+    TeamAnswerInput:
+      type: object
+      properties:
+        correct: { type: boolean }
+      required: [correct]
+    TeamSharedCodeInput:
+      type: object
+      properties:
+        code: { type: string, minLength: 1, maxLength: 64 }
+      required: [code]
     GameSettings:
       type: object
       properties:

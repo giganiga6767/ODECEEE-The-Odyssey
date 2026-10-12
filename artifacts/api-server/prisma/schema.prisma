@@ -13,6 +13,20 @@ enum TeamStatus {
   FINISHED
 }
 
+enum TeamFlowState {
+  EN_ROUTE
+  AWAITING_ANSWER
+  DETOUR_EN_ROUTE
+  AWAITING_DETOUR_CODE
+  AWAITING_FINAL_CODE
+}
+
+enum CompletionVerificationMethod {
+  GPS
+  VOLUNTEER
+  ADMIN_CODE
+}
+
 enum EventStatus {
   NOT_STARTED
   ACTIVE
@@ -48,6 +62,10 @@ model Team {
   startedAt      DateTime?
   finishedAt     DateTime?
   currentIndex   Int          @default(0)
+  flowState      TeamFlowState @default(EN_ROUTE)
+  checkpointArrivedAt DateTime?
+  detourSourceCheckpointId String?
+  lastAnswerCorrect Boolean?
   lastLat        Float?
   lastLng        Float?
   lastAccuracy   Float?
@@ -83,9 +101,13 @@ model Checkpoint {
   hint        String?
   isActive    Boolean      @default(true)
   isFinalStop Boolean      @default(false)
+  isDetour    Boolean      @default(false)
+  questionText String?     @db.Text
   createdAt   DateTime     @default(now())
   routes      TeamRoute[]
   completions Completion[]
+  detourEventState EventState[] @relation("EventDetourCheckpoint")
+  detourTriggerEventState EventState[] @relation("EventDetourTrigger")
 }
 
 model TeamRoute {
@@ -109,6 +131,7 @@ model Completion {
   completedAt        DateTime   @default(now())
   distanceAtCaptureM Float
   accuracyM          Float
+  verificationMethod CompletionVerificationMethod @default(GPS)
   round              Int        @default(1)
   team               Team       @relation(fields: [teamId], references: [id], onDelete: Cascade)
   checkpoint         Checkpoint @relation(fields: [checkpointId], references: [id], onDelete: Restrict)
@@ -126,10 +149,17 @@ model GameSettings {
 }
 
 model EventState {
-  id        String      @id @default("global")
-  status    EventStatus @default(NOT_STARTED)
-  startedAt DateTime?
-  endedAt   DateTime?
-  currentRound Int @default(1)
-  updatedAt DateTime    @updatedAt
+  id                        String      @id @default("global")
+  status                    EventStatus @default(NOT_STARTED)
+  startedAt                 DateTime?
+  endedAt                   DateTime?
+  currentRound              Int         @default(1)
+  detourEnabled             Boolean     @default(false)
+  detourCheckpointId        String?
+  detourTriggerCheckpointId String?
+  finalUnlockCodeHash       String?
+  detourUnlockCodeHash      String?
+  detourCheckpoint          Checkpoint? @relation("EventDetourCheckpoint", fields: [detourCheckpointId], references: [id], onDelete: SetNull)
+  detourTriggerCheckpoint   Checkpoint? @relation("EventDetourTrigger", fields: [detourTriggerCheckpointId], references: [id], onDelete: SetNull)
+  updatedAt                 DateTime    @updatedAt
 }

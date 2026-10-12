@@ -14,4 +14,8 @@ export interface GameCheckpoint {
   radiusM: number;
   /** @nullable */
   hint: string | null;
+  /** @nullable */
+  questionText: string | null;
+  isFinalStop: boolean;
+  isDetour: boolean;
 }
